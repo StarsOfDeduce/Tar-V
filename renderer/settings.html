@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tar V - 设置</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    body {
+      background: var(--bg-app);
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .settings-window-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      background: var(--bg-app);
+      position: relative;
+    }
+    .settings-sidebar {
+      height: 100%;
+      width: 180px;
+      flex-shrink: 0;
+    }
+    .settings-content {
+      flex: 1;
+      height: 100%;
+      padding: 24px 32px 80px 32px; /* Bottom padding for fixed footer */
+      overflow-y: auto;
+    }
+    .settings-footer {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      left: 180px;
+      background: var(--bg-app);
+      padding: 16px 32px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      z-index: 100;
+    }
+    /* Seamless dialog overlay overrides for settings page */
+    .modal-header {
+      background: transparent !important;
+      border-bottom: none !important;
+    }
+    .modal-footer {
+      background: transparent !important;
+      border-top: none !important;
+      justify-content: center !important;
+      gap: 16px !important;
+      padding-bottom: 24px !important;
+    }
+    #dialog-modal .btn-primary, #dialog-modal .btn-secondary,
+    #prompt-modal .btn-primary, #prompt-modal .btn-secondary {
+      padding: 10px 24px !important;
+      font-size: 13px !important;
+      min-width: 100px !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-window-container">
+    <!-- Settings Sidebar -->
+    <aside class="settings-sidebar no-drag">
+      <div class="sidebar-header">
+        <h3>设置中心</h3>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-item active" data-tab="settings-general">
+          <span>常规</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-appearance">
+          <span>外观</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-preferences">
+          <span>偏好</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-hotkeys">
+          <span>唤出与收起</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-tabs">
+          <span>切换标签</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-maintenance">
+          <span>维护</span>
+        </div>
+        <div class="sidebar-item" data-tab="settings-import">
+          <span>备份与恢复</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <span>Tar V v1.0</span>
+      </div>
+    </aside>
+
+    <!-- Settings Content -->
+    <main class="settings-content no-drag">
+      
+      <!-- Tab 1: General (常规) -->
+      <section id="settings-general" class="settings-section active">
+        <h2>常规设置</h2>
+        <hr class="settings-divider">
+        
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">语言</div>
+            <div class="setting-desc">选择界面的显示语言</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-language" class="dropdown-style">
+              <option value="zh">简体中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">开机自启动</div>
+            <div class="setting-desc">Windows 系统登录后自动运行 Tar V</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-autostart">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">显示搜索框</div>
+            <div class="setting-desc">开启或关闭主界面右上角的搜索框</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-show-search">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Appearance (外观) -->
+      <section id="settings-appearance" class="settings-section">
+        <h2>外观设置</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">界面风格</div>
+            <div class="setting-desc">切换主面板的主题风格模式</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-style-mode" class="dropdown-style">
+              <option value="dark">深色模式</option>
+              <option value="light">浅色模式</option>
+              <option value="system">跟随系统</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">网格列数</div>
+            <div class="setting-desc">主面板中每行显示的快捷图标列数 (6 - 12)</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-columns" class="dropdown-style">
+              <option value="6">6 列</option>
+              <option value="7">7 列</option>
+              <option value="8">8 列</option>
+              <option value="9">9 列</option>
+              <option value="10">10 列</option>
+              <option value="12">12 列</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">背景基色</div>
+            <div class="setting-desc">选择或输入面板的基础背景色</div>
+          </div>
+          <div class="setting-action" style="display:flex; align-items:center; gap:8px;">
+            <input type="color" id="opt-bg-color-picker" style="width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; outline:none;">
+            <input type="text" id="opt-bg-color" class="dropdown-style" style="width:78px; text-align:center; padding:4px 6px;" value="#1e1e1e">
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">高亮主题色</div>
+            <div class="setting-desc">修改按钮、激活标签和边框的高亮颜色</div>
+          </div>
+          <div class="setting-action" style="display:flex; align-items:center; gap:8px;">
+            <input type="color" id="opt-accent-color-picker" style="width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; outline:none;">
+            <input type="text" id="opt-accent-color" class="dropdown-style" style="width:78px; text-align:center; padding:4px 6px;" value="#e04f35">
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">面板背景不透明度</div>
+            <div class="setting-desc">调整主窗口背景透明度 (30% - 100%, 仅对毛玻璃及液态玻璃风格有效)</div>
+          </div>
+          <div class="setting-action">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="opt-opacity" min="30" max="100" value="85" style="width:80px; accent-color:var(--accent);">
+              <span id="opt-opacity-val" style="font-size:11px; width:28px;">85%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">圆角大小</div>
+            <div class="setting-desc">调整主窗口四角的圆角程度</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-radius" class="dropdown-style">
+              <option value="0px">直角 (0px)</option>
+              <option value="4px">小圆角 (4px)</option>
+              <option value="8px">中圆角 (8px)</option>
+              <option value="12px">大圆角 (12px)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">隐藏项目名称</div>
+            <div class="setting-desc">仅显示图标，隐藏快捷方式名称</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-hide-names">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Custom Sizers (Req 23) -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">标签页字体大小</div>
+            <div class="setting-desc">控制主界面分组标签文本字号 (10px - 24px)</div>
+          </div>
+          <div class="setting-action">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="opt-font-size-tab" min="10" max="24" value="14" style="width:80px; accent-color:var(--accent);">
+              <span id="opt-font-size-tab-val" style="font-size:11px; width:28px;">14px</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">快捷项字体大小</div>
+            <div class="setting-desc">控制主界面快捷项名称文本字号 (10px - 24px)</div>
+          </div>
+          <div class="setting-action">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="opt-font-size-item" min="10" max="24" value="13" style="width:80px; accent-color:var(--accent);">
+              <span id="opt-font-size-item-val" style="font-size:11px; width:28px;">13px</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">设置中心字体大小</div>
+            <div class="setting-desc">控制本设置页面内所有文本字号 (10px - 24px)</div>
+          </div>
+          <div class="setting-action">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="range" id="opt-font-size-settings" min="10" max="24" value="14" style="width:80px; accent-color:var(--accent);">
+              <span id="opt-font-size-settings-val" style="font-size:11px; width:28px;">14px</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Preferences (偏好) -->
+      <section id="settings-preferences" class="settings-section">
+        <h2>偏好设置</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">项目启动点击模式</div>
+            <div class="setting-desc">运行快捷项需要的鼠标点击次数</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-click-mode" class="dropdown-style">
+              <option value="single">单击运行</option>
+              <option value="double">双击运行</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">启动项目后自动收起</div>
+            <div class="setting-desc">当运行某个快捷项后，自动关闭 Tar V 窗口</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-autohide-launch">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">失去焦点自动收起</div>
+            <div class="setting-desc">点击窗口外部或切换到其他应用时，自动收起面板</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-autohide-blur">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: Show/Hide (唤出与收起) -->
+      <section id="settings-hotkeys" class="settings-section">
+        <h2>唤出与收起</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">键盘快捷键唤出面板</div>
+            <div class="setting-desc">按下该快捷键可以快速切换面板显示与隐藏</div>
+          </div>
+          <div class="setting-action">
+            <div class="hotkey-input-container">
+              <input type="text" id="opt-hotkey" class="hotkey-input-box" readonly placeholder="点击录制快捷键">
+              <span class="hotkey-tip">支持 Alt, Ctrl, Shift 组合键</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">按下 ESC 键收起面板</div>
+            <div class="setting-desc">当面板处于显示状态时，按 ESC 键隐藏</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-esc-hide">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">面板唤出位置</div>
+            <div class="setting-desc">选择呼出面板时的放置逻辑</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-popup-pos" class="dropdown-style">
+              <option value="center">屏幕中央</option>
+              <option value="cursor">跟随鼠标屏幕</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 5: Tabs Switch (切换标签) -->
+      <section id="settings-tabs" class="settings-section">
+        <h2>切换标签</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">通过鼠标悬停切换标签</div>
+            <div class="setting-desc">鼠标移至顶部标签上方停留 200ms 后自动切换</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-tab-hover">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">通过鼠标滚轮切换标签</div>
+            <div class="setting-desc">在顶部标签栏上滚动鼠标滚轮可在标签间快速切换</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-tab-scroll">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">通过键盘数字键切换标签</div>
+            <div class="setting-desc">按数字键 1-9 快速选择前 9 个分组标签页</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="opt-tab-keys">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 6: Maintenance (维护) -->
+      <section id="settings-maintenance" class="settings-section">
+        <h2>维护服务</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">修复并重载图标</div>
+            <div class="setting-desc">重新提取并刷新所有快捷启动项目的图标缓存。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-repair-icons" class="btn-secondary btn-sm">执行</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">按名称排序全部项</div>
+            <div class="setting-desc">对所有标签下的快捷项按拼音与字母进行升序排列。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-sort-all-items" class="btn-secondary btn-sm">执行</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">清理全部重复项</div>
+            <div class="setting-desc">扫描并删除所有指向相同目标路径的重复快捷方式。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-clean-duplicates" class="btn-secondary btn-sm">执行</button>
+          </div>
+        </div>
+
+        <div class="setting-row align-start">
+          <div class="setting-info">
+            <div class="setting-title">清理全部失效项</div>
+            <div class="setting-desc">检测并清理所有已经不存在的本地文件或文件夹快捷路径。</div>
+            <div id="path-check-results" class="path-check-results" style="display:none;">
+              <!-- Dead links are listed here -->
+            </div>
+          </div>
+          <div class="setting-action flex-col">
+            <button id="btn-scan-paths" class="btn-secondary btn-sm">扫描检测</button>
+            <button id="btn-clean-paths" class="btn-danger btn-sm" style="display:none; margin-top:8px;">一键清理</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">清理空标签</div>
+            <div class="setting-desc">扫描并直接删除任何不含快捷图标的分组标签页。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-clean-empty-tabs" class="btn-secondary btn-sm">执行</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 7: Import/Export (导入数据) -->
+      <section id="settings-import" class="settings-section">
+        <h2>备份与恢复</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">备份配置文件</div>
+            <div class="setting-desc">将当前的标签、快捷项及个人偏好设置导出为 `.json` 文件。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-export-config" class="btn-secondary">导出数据</button>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">恢复配置文件</div>
+            <div class="setting-desc">从已备份的 JSON 配置文件恢复所有项目。</div>
+          </div>
+          <div class="setting-action">
+            <button id="btn-import-config" class="btn-primary">导入数据</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Footer -->
+      <footer class="settings-footer">
+        <button id="btn-settings-save" class="btn-primary" style="font-size: 14px; padding: 10px 24px;">保存修改</button>
+        <button id="btn-settings-cancel" class="btn-secondary" style="font-size: 14px; padding: 10px 24px;">取消</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Custom Dialog Modal (Alert/Confirm) -->
+  <div id="dialog-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="width: 400px;">
+      <div class="modal-header">
+        <h3 id="dialog-title">提示</h3>
+        <button class="modal-close" id="dialog-close-x">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px; font-size: 13px; color: var(--text-primary); line-height: 1.5;">
+        <p id="dialog-message" style="word-break: break-all; overflow-wrap: break-word; white-space: pre-wrap; margin: 0; text-align: left; max-height: 250px; overflow-y: auto;">提示内容</p>
+      </div>
+      <div class="modal-footer">
+        <button id="dialog-cancel-btn" class="btn-secondary">取消</button>
+        <button id="dialog-confirm-btn" class="btn-primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Prompt Modal -->
+  <div id="prompt-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="width: 440px;">
+      <div class="modal-header">
+        <h3 id="prompt-title" style="font-size: 16px;">输入</h3>
+        <button class="modal-close" id="prompt-close-x" style="font-size: 22px;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <p id="prompt-message" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; word-break: break-all; overflow-wrap: break-word; white-space: pre-wrap;">请输入值</p>
+        <input type="text" id="prompt-input" class="dropdown-style" style="width: 100%; font-size: 15px; padding: 10px 14px; box-sizing: border-box; background: rgba(0,0,0,0.3);" placeholder="">
+      </div>
+      <div class="modal-footer">
+        <button id="prompt-cancel-btn" class="btn-secondary" style="font-size: 14px; padding: 10px 24px;">取消</button>
+        <button id="prompt-confirm-btn" class="btn-primary" style="font-size: 14px; padding: 10px 24px;">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
