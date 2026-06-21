@@ -16,9 +16,12 @@ window.addEventListener('dragover', (e) => {
   if (settingsModal && settingsModal.style.display === 'flex') return;
   if (editModal && editModal.style.display === 'flex') return;
   
-  const dragOverlay = document.getElementById('drag-overlay');
-  if (dragOverlay) {
-    dragOverlay.classList.add('active');
+  // Only show the overlay if we are dragging external files (Req 45)
+  if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+    const dragOverlay = document.getElementById('drag-overlay');
+    if (dragOverlay) {
+      dragOverlay.classList.add('active');
+    }
   }
 });
 
