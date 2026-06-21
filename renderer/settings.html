@@ -88,6 +88,9 @@
         <div class="sidebar-item" data-tab="settings-tabs">
           <span>切换标签</span>
         </div>
+        <div class="sidebar-item" data-tab="settings-common-apps">
+          <span>常用软件</span>
+        </div>
         <div class="sidebar-item" data-tab="settings-maintenance">
           <span>维护</span>
         </div>
@@ -96,7 +99,7 @@
         </div>
       </nav>
       <div class="sidebar-footer">
-        <span>Tar V v1.0</span>
+        <span>Tar V v1.0.1</span>
       </div>
     </aside>
 
@@ -308,6 +311,19 @@
 
         <div class="setting-row">
           <div class="setting-info">
+            <div class="setting-title">图标拖动模式</div>
+            <div class="setting-desc">在主界面拖动图标调整顺序时的行为</div>
+          </div>
+          <div class="setting-action">
+            <select id="opt-drag-mode" class="dropdown-style">
+              <option value="sort">排序式拖动 (插入)</option>
+              <option value="swap">交换式拖动 (对调)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
             <div class="setting-title">启动项目后自动收起</div>
             <div class="setting-desc">当运行某个快捷项后，自动关闭 Tar V 窗口</div>
           </div>
@@ -417,6 +433,116 @@
           <div class="setting-action">
             <label class="switch">
               <input type="checkbox" id="opt-tab-keys">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 5b: Common Windows Apps (常用软件) -->
+      <section id="settings-common-apps" class="settings-section">
+        <h2>常用软件设置</h2>
+        <hr class="settings-divider">
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-cmd">命令提示符 (cmd.exe)</div>
+            <div class="setting-desc" id="desc-win-cmd">Windows 命令行工具</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-cmd" class="common-app-checkbox" data-path="cmd.exe" data-name="命令提示符" data-name-en="Command Prompt">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-explorer">文件资源管理器 (explorer.exe)</div>
+            <div class="setting-desc" id="desc-win-explorer">文件和文件夹浏览工具</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-explorer" class="common-app-checkbox" data-path="explorer.exe" data-name="文件资源管理器" data-name-en="File Explorer">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-taskmgr">任务管理器 (taskmgr.exe)</div>
+            <div class="setting-desc" id="desc-win-taskmgr">查看系统运行进程与性能监测</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-taskmgr" class="common-app-checkbox" data-path="taskmgr.exe" data-name="任务管理器" data-name-en="Task Manager">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-calc">计算器 (calc.exe)</div>
+            <div class="setting-desc" id="desc-win-calc">Windows 内置计算器</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-calc" class="common-app-checkbox" data-path="calc.exe" data-name="计算器" data-name-en="Calculator">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-notepad">记事本 (notepad.exe)</div>
+            <div class="setting-desc" id="desc-win-notepad">简易文本编辑器</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-notepad" class="common-app-checkbox" data-path="notepad.exe" data-name="记事本" data-name-en="Notepad">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-control">控制面板 (control.exe)</div>
+            <div class="setting-desc" id="desc-win-control">管理系统设置和控制面板选项</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-control" class="common-app-checkbox" data-path="control.exe" data-name="控制面板" data-name-en="Control Panel">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-regedit">注册表编辑器 (regedit.exe)</div>
+            <div class="setting-desc" id="desc-win-regedit">查看及修改 Windows 注册表配置</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-regedit" class="common-app-checkbox" data-path="regedit.exe" data-name="注册表编辑器" data-name-en="Registry Editor">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title" id="lbl-win-devmgmt">设备管理器 (devmgmt.msc)</div>
+            <div class="setting-desc" id="desc-win-devmgmt">查看并管理硬件设备和驱动程序</div>
+          </div>
+          <div class="setting-action">
+            <label class="switch">
+              <input type="checkbox" id="win-app-devmgmt" class="common-app-checkbox" data-path="devmgmt.msc" data-name="设备管理器" data-name-en="Device Manager">
               <span class="slider round"></span>
             </label>
           </div>

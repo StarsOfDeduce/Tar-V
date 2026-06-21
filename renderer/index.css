@@ -293,12 +293,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 80px;
   height: 80px;
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  margin: 0 auto;
 }
 
 .grid-item:hover {
@@ -1390,5 +1392,40 @@ body.light-theme .custom-select-option.selected {
 #btn-settings-cancel {
   font-size: 14px !important; /* Increased by 2px (from 12px) */
   padding: 10px 24px !important;
+}
+
+/* Drag-and-drop reordering visual indicators (Req 45 & 46) */
+.grid-item.dragging {
+  opacity: 0.35 !important;
+  transform: scale(0.95) !important;
+  border: 1px dashed var(--accent) !important;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.grid-item.drag-over-before {
+  border-left: 3px solid var(--accent) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.grid-item.drag-over-after {
+  border-right: 3px solid var(--accent) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.grid-item.drag-over-swap {
+  border: 1px solid var(--accent) !important;
+  box-shadow: 0 0 8px var(--accent) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Snappy drag response: disable pointer events on children so click/drag falls through to parent card instantly */
+.grid-item > * {
+  pointer-events: none;
+}
+
+/* Allow checking/unchecking items in batch mode */
+.grid-item.batch-mode-item .batch-checkbox {
+  pointer-events: auto !important;
 }
 

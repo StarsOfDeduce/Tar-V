@@ -4,6 +4,7 @@ let activeTabId = null;
 let selectedItemId = null;
 let isBatchMode = false;
 let selectedItemsForBatch = new Set();
+let draggedItemId = null;
 
 // Dictionary for multi-language translation (Req 34)
 const TRANSLATIONS = {
@@ -691,6 +692,7 @@ async function renderItems(query = '') {
     iconImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2FhYSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMkg2YTIgMiAwIDAgMC0yIDJ2MTZhMiAyIDAgMCAwIDIgMmgyMTZhMiAyIDAgMCAwIDItMlY4eiIvPjxwYXRoIGQ9Ik0xNCAydjZoNnoiIGZpbGw9IiNmZmYiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg==';
     
     iconWrap.appendChild(iconImg);
+    iconImg.setAttribute('draggable', 'false'); // Prevents browser image drag delay (Req 46)
     card.appendChild(iconWrap);
 
     const nameSpan = document.createElement('span');
@@ -777,6 +779,25 @@ async function renderItems(query = '') {
           }
         });
       }
+    }
+
+    // --- Reordering Drag and Drop listeners (Req 45 & 46) ---
+    if (!isBatchMode && !isSearch) {
+      card.setAttribute('draggable', 'true');
+
+      card.addEventListener('dragstart', (e) => {
+        draggedItemId = item.id;
+        e.dataTransfer.setData('text/plain', item.id);
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.grid-item').forEach(el => {
+          el.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-swap');
+        });
+      });
     }
   }
 }
@@ -1096,6 +1117,34 @@ async function saveItemDetails() {
   renderItems();
 }
 
+function getClosestGridItem(gridElement, clientX, clientY, excludeId = null) {
+  let cards = Array.from(gridElement.querySelectorAll('.grid-item:not(.dragging)'));
+  if (excludeId) {
+    cards = cards.filter(card => card.dataset.id !== excludeId);
+  }
+  if (cards.length === 0) return null;
+  
+  let closestCard = null;
+  let minDistance = Infinity;
+  
+  cards.forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const cardCenterX = rect.left + rect.width / 2;
+    const cardCenterY = rect.top + rect.height / 2;
+    
+    const dx = clientX - cardCenterX;
+    const dy = clientY - cardCenterY;
+    const distance = dx * dx + dy * dy;
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestCard = card;
+    }
+  });
+  
+  return closestCard;
+}
+
 function setupEventListeners() {
   closeBtn.addEventListener('click', () => {
     window.api.hideWindow();
@@ -1123,6 +1172,107 @@ function setupEventListeners() {
   modalSaveBtn.addEventListener('click', saveItemDetails);
   modalCancelBtn.addEventListener('click', () => editModal.style.display = 'none');
   modalCloseX.addEventListener('click', () => editModal.style.display = 'none');
+
+  // Container-level drag & drop handlers for responsive card reordering (Req 46)
+  itemsGrid.addEventListener('dragover', (e) => {
+    if (isBatchMode || searchInput.value.trim().length > 0) return;
+    
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    let closestCard = e.target.closest('.grid-item');
+    if (closestCard && closestCard.classList.contains('dragging')) {
+      closestCard = null;
+    }
+    if (!closestCard) {
+      closestCard = getClosestGridItem(itemsGrid, e.clientX, e.clientY, draggedItemId);
+    }
+    
+    // Clear other drag highlights
+    itemsGrid.querySelectorAll('.grid-item').forEach(el => {
+      if (el !== closestCard) {
+        el.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-swap');
+      }
+    });
+    
+    if (closestCard) {
+      const dragMode = config.settings.dragMode || 'sort';
+      if (dragMode === 'swap') {
+        closestCard.classList.add('drag-over-swap');
+      } else {
+        const rect = closestCard.getBoundingClientRect();
+        const isAfter = e.clientX > rect.left + rect.width / 2;
+        
+        if (isAfter) {
+          closestCard.classList.add('drag-over-after');
+          closestCard.classList.remove('drag-over-before');
+        } else {
+          closestCard.classList.add('drag-over-before');
+          closestCard.classList.remove('drag-over-after');
+        }
+      }
+    }
+  });
+
+  itemsGrid.addEventListener('dragleave', (e) => {
+    // Check if dragging completely outside the grid bounds
+    const rect = itemsGrid.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+      itemsGrid.querySelectorAll('.grid-item').forEach(el => {
+        el.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-swap');
+      });
+    }
+  });
+
+  itemsGrid.addEventListener('drop', async (e) => {
+    if (isBatchMode || searchInput.value.trim().length > 0) return;
+    e.preventDefault();
+    
+    itemsGrid.querySelectorAll('.grid-item').forEach(el => {
+      el.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-swap');
+    });
+    
+    const draggedId = e.dataTransfer.getData('text/plain') || draggedItemId;
+    let closestCard = e.target.closest('.grid-item');
+    if (closestCard && closestCard.dataset.id === draggedId) {
+      closestCard = null;
+    }
+    if (!closestCard) {
+      closestCard = getClosestGridItem(itemsGrid, e.clientX, e.clientY, draggedId);
+    }
+    if (!closestCard || !draggedId || draggedId === closestCard.dataset.id) return;
+    
+    const draggedIdx = config.items.findIndex(i => i.id === draggedId);
+    const targetIdx = config.items.findIndex(i => i.id === closestCard.dataset.id);
+    
+    if (draggedIdx === -1 || targetIdx === -1) return;
+    
+    const dragMode = config.settings.dragMode || 'sort';
+    
+    if (dragMode === 'swap') {
+      // Swap items (exchange positions) (Req 46)
+      const draggedItem = config.items[draggedIdx];
+      const targetItem = config.items[targetIdx];
+      config.items.splice(draggedIdx, 1, targetItem);
+      config.items.splice(targetIdx, 1, draggedItem);
+    } else {
+      // Sort/Insert item at target index (Req 46)
+      const rect = closestCard.getBoundingClientRect();
+      const isAfter = e.clientX > rect.left + rect.width / 2;
+      
+      const [draggedItem] = config.items.splice(draggedIdx, 1);
+      
+      let newTargetIdx = config.items.findIndex(i => i.id === closestCard.dataset.id);
+      if (isAfter) {
+        newTargetIdx += 1;
+      }
+      
+      config.items.splice(newTargetIdx, 0, draggedItem);
+    }
+    
+    await window.api.saveConfig(config);
+    renderItems();
+  });
 
   document.getElementById('browse-file-btn').addEventListener('click', async () => {
     const p = await window.api.selectFile();

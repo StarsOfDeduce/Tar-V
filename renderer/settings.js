@@ -11,6 +11,7 @@ const TRANSLATIONS = {
     sidebarPreferences: "偏好",
     sidebarHotkeys: "唤出与收起",
     sidebarTabs: "切换标签",
+    sidebarCommonApps: "常用软件",
     sidebarMaintenance: "维护",
     sidebarImport: "备份与恢复",
     
@@ -19,8 +20,26 @@ const TRANSLATIONS = {
     titlePreferences: "偏好设置",
     titleHotkeys: "唤出与收起",
     titleTabs: "切换标签",
+    titleCommonApps: "常用软件设置",
     titleMaintenance: "维护服务",
     titleImport: "备份与恢复",
+
+    winCmdTitle: "命令提示符 (cmd.exe)",
+    winCmdDesc: "Windows 命令行工具",
+    winExplorerTitle: "文件资源管理器 (explorer.exe)",
+    winExplorerDesc: "文件和文件夹浏览工具",
+    winTaskmgrTitle: "任务管理器 (taskmgr.exe)",
+    winTaskmgrDesc: "查看系统运行进程与性能监测",
+    winCalcTitle: "计算器 (calc.exe)",
+    winCalcDesc: "Windows 内置计算器",
+    winNotepadTitle: "记事本 (notepad.exe)",
+    winNotepadDesc: "简易文本编辑器",
+    winControlTitle: "控制面板 (control.exe)",
+    winControlDesc: "管理系统设置和控制面板选项",
+    winRegeditTitle: "注册表编辑器 (regedit.exe)",
+    winRegeditDesc: "查看及修改 Windows 注册表配置",
+    winDevmgmtTitle: "设备管理器 (devmgmt.msc)",
+    winDevmgmtDesc: "查看并管理硬件设备和驱动程序",
 
     btnSave: "保存修改",
     btnCancel: "取消",
@@ -65,6 +84,10 @@ const TRANSLATIONS = {
     opt_click_desc: "运行快捷项需要的鼠标点击次数",
     click_single: "单击运行",
     click_double: "双击运行",
+    opt_drag_title: "图标拖动模式",
+    opt_drag_desc: "在主界面拖动图标调整顺序时的行为",
+    drag_sort: "排序式拖动 (插入)",
+    drag_swap: "交换式拖动 (对调)",
     opt_autohide_launch_title: "启动项目后自动收起",
     opt_autohide_launch_desc: "当运行某个快捷项后，自动关闭 Tar V 窗口",
     opt_autohide_blur_title: "失去焦点自动收起",
@@ -131,6 +154,7 @@ const TRANSLATIONS = {
     sidebarPreferences: "Preferences",
     sidebarHotkeys: "Shortcuts",
     sidebarTabs: "Tabs",
+    sidebarCommonApps: "Common Apps",
     sidebarMaintenance: "Maintenance",
     sidebarImport: "Backup",
     
@@ -139,8 +163,26 @@ const TRANSLATIONS = {
     titlePreferences: "Preferences",
     titleHotkeys: "Show & Hide",
     titleTabs: "Tab Switching",
+    titleCommonApps: "Common Windows Apps",
     titleMaintenance: "Maintenance",
     titleImport: "Backup & Restore",
+
+    winCmdTitle: "Command Prompt (cmd.exe)",
+    winCmdDesc: "Windows command-line interpreter utility",
+    winExplorerTitle: "File Explorer (explorer.exe)",
+    winExplorerDesc: "File manager and explorer helper",
+    winTaskmgrTitle: "Task Manager (taskmgr.exe)",
+    winTaskmgrDesc: "Monitor system performance and processes",
+    winCalcTitle: "Calculator (calc.exe)",
+    winCalcDesc: "Built-in Windows math calculator",
+    winNotepadTitle: "Notepad (notepad.exe)",
+    winNotepadDesc: "Simple plain-text text editor",
+    winControlTitle: "Control Panel (control.exe)",
+    winControlDesc: "Access legacy Windows settings and config",
+    winRegeditTitle: "Registry Editor (regedit.exe)",
+    winRegeditDesc: "Browse and configure system registry settings",
+    winDevmgmtTitle: "Device Manager (devmgmt.msc)",
+    winDevmgmtDesc: "Manage hardware components and drivers",
 
     btnSave: "Save Changes",
     btnCancel: "Cancel",
@@ -185,6 +227,10 @@ const TRANSLATIONS = {
     opt_click_desc: "Number of mouse clicks required to run a shortcut item",
     click_single: "Single Click",
     click_double: "Double Click",
+    opt_drag_title: "Icon Drag Mode",
+    opt_drag_desc: "Behavior when dragging icons to reorder on the main panel",
+    drag_sort: "Sorting Drag (Insert)",
+    drag_swap: "Swapping Drag (Exchange)",
     opt_autohide_launch_title: "Auto Hide on Launch",
     opt_autohide_launch_desc: "Automatically hide Tar V launcher window after running any item",
     opt_autohide_blur_title: "Auto Hide on Blur",
@@ -261,6 +307,7 @@ function translateUI() {
   setSidebarText("settings-preferences", t.sidebarPreferences);
   setSidebarText("settings-hotkeys", t.sidebarHotkeys);
   setSidebarText("settings-tabs", t.sidebarTabs);
+  setSidebarText("settings-common-apps", t.sidebarCommonApps);
   setSidebarText("settings-maintenance", t.sidebarMaintenance);
   setSidebarText("settings-import", t.sidebarImport);
 
@@ -274,6 +321,7 @@ function translateUI() {
   setSecTitle("settings-preferences", t.titlePreferences);
   setSecTitle("settings-hotkeys", t.titleHotkeys);
   setSecTitle("settings-tabs", t.titleTabs);
+  setSecTitle("settings-common-apps", t.titleCommonApps);
   setSecTitle("settings-maintenance", t.titleMaintenance);
   setSecTitle("settings-import", t.titleImport);
 
@@ -309,6 +357,7 @@ function translateUI() {
   setTranslation('opt-font-size-item', 'opt_fsitem_title', 'opt_fsitem_desc');
   setTranslation('opt-font-size-settings', 'opt_fssettings_title', 'opt_fssettings_desc');
   setTranslation('opt-click-mode', 'opt_click_title', 'opt_click_desc');
+  setTranslation('opt-drag-mode', 'opt_drag_title', 'opt_drag_desc');
   setTranslation('opt-autohide-launch', 'opt_autohide_launch_title', 'opt_autohide_launch_desc');
   setTranslation('opt-autohide-blur', 'opt_autohide_blur_title', 'opt_autohide_blur_desc');
   setTranslation('opt-hotkey', 'opt_hotkey_title', 'opt_hotkey_desc');
@@ -354,6 +403,11 @@ function translateUI() {
     double: t.click_double
   });
 
+  translateDropdown('opt-drag-mode', {
+    sort: t.drag_sort,
+    swap: t.drag_swap
+  });
+
   translateDropdown('opt-popup-pos', {
     center: t.pos_center,
     cursor: t.pos_cursor
@@ -397,6 +451,27 @@ function translateUI() {
   if (promptCancelBtn) promptCancelBtn.textContent = t.btnCancel;
   const promptConfirmBtn = document.getElementById('prompt-confirm-btn');
   if (promptConfirmBtn) promptConfirmBtn.textContent = t.btnConfirm;
+
+  const setElText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+  setElText("lbl-win-cmd", t.winCmdTitle);
+  setElText("desc-win-cmd", t.winCmdDesc);
+  setElText("lbl-win-explorer", t.winExplorerTitle);
+  setElText("desc-win-explorer", t.winExplorerDesc);
+  setElText("lbl-win-taskmgr", t.winTaskmgrTitle);
+  setElText("desc-win-taskmgr", t.winTaskmgrDesc);
+  setElText("lbl-win-calc", t.winCalcTitle);
+  setElText("desc-win-calc", t.winCalcDesc);
+  setElText("lbl-win-notepad", t.winNotepadTitle);
+  setElText("desc-win-notepad", t.winNotepadDesc);
+  setElText("lbl-win-control", t.winControlTitle);
+  setElText("desc-win-control", t.winControlDesc);
+  setElText("lbl-win-regedit", t.winRegeditTitle);
+  setElText("desc-win-regedit", t.winRegeditDesc);
+  setElText("lbl-win-devmgmt", t.winDevmgmtTitle);
+  setElText("desc-win-devmgmt", t.winDevmgmtDesc);
 
   // Initialize custom HTML selects (Req 41)
   initCustomSelects();
@@ -504,6 +579,7 @@ const optFontSizeSettingsVal = document.getElementById('opt-font-size-settings-v
 
 // Preferences, Hotkeys, Tabs
 const optClickMode = document.getElementById('opt-click-mode');
+const optDragMode = document.getElementById('opt-drag-mode');
 const optAutohideLaunch = document.getElementById('opt-autohide-launch');
 const optAutohideBlur = document.getElementById('opt-autohide-blur');
 const optHotkey = document.getElementById('opt-hotkey');
@@ -618,6 +694,7 @@ function mergeDefaultSettings() {
     autoHideOnBlur: true,
     pressEscToHide: true,
     clickMode: 'single',
+    dragMode: 'sort',
     popupPos: 'center',
     keepCentered: true,
     columns: 8,
@@ -681,6 +758,7 @@ function initFormValues() {
 
   // Preferences, hotkeys, tabs
   optClickMode.value = config.settings.clickMode || 'single';
+  optDragMode.value = config.settings.dragMode || 'sort';
   optAutohideLaunch.checked = config.settings.autoHideOnLaunch;
   optAutohideBlur.checked = config.settings.autoHideOnBlur;
   optHotkey.value = config.settings.hotkey;
@@ -689,6 +767,34 @@ function initFormValues() {
   optTabHover.checked = config.settings.tabHover || false;
   optTabScroll.checked = config.settings.tabScroll || false;
   optTabKeys.checked = config.settings.tabKeys || false;
+
+  // Initialize Common Windows Software checkboxes
+  const commonApps = [
+    { id: 'win-app-cmd', path: 'cmd.exe' },
+    { id: 'win-app-explorer', path: 'explorer.exe' },
+    { id: 'win-app-taskmgr', path: 'taskmgr.exe' },
+    { id: 'win-app-calc', path: 'calc.exe' },
+    { id: 'win-app-notepad', path: 'notepad.exe' },
+    { id: 'win-app-control', path: 'control.exe' },
+    { id: 'win-app-regedit', path: 'regedit.exe' },
+    { id: 'win-app-devmgmt', path: 'devmgmt.msc' }
+  ];
+
+  const commonTab = config.tabs.find(t => t.name === '常用' || t.name === 'Common');
+  commonApps.forEach(app => {
+    const el = document.getElementById(app.id);
+    if (el) {
+      if (commonTab) {
+        const targetLower = app.path.toLowerCase();
+        el.checked = config.items.some(item => 
+          item.tabId === commonTab.id && 
+          (item.path.toLowerCase() === targetLower || item.path.toLowerCase().endsWith('\\' + targetLower))
+        );
+      } else {
+        el.checked = false;
+      }
+    }
+  });
 }
 
 // Dynamically apply visual settings to this window in real-time
@@ -887,6 +993,10 @@ function setupEventListeners() {
     config.settings.clickMode = e.target.value;
   });
 
+  optDragMode.addEventListener('change', (e) => {
+    config.settings.dragMode = e.target.value;
+  });
+
   optAutohideLaunch.addEventListener('change', (e) => {
     config.settings.autoHideOnLaunch = e.target.checked;
   });
@@ -943,6 +1053,74 @@ function setupEventListeners() {
 
   optTabKeys.addEventListener('change', (e) => {
     config.settings.tabKeys = e.target.checked;
+  });
+
+  // 6. Common Windows Software toggling
+  document.querySelectorAll('.common-app-checkbox').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      const checkbox = e.target;
+      const path = checkbox.dataset.path;
+      const lang = config.settings.language || 'zh';
+      const name = lang === 'zh' ? checkbox.dataset.name : checkbox.dataset.nameEn;
+      
+      const getOrCreateCommonTab = () => {
+        let tab = config.tabs.find(t => t.name === '常用' || t.name === 'Common');
+        if (tab) return tab.id;
+        
+        if (config.tabs.length > 0) return config.tabs[0].id;
+        
+        const newTabId = 'tab-' + Date.now();
+        config.tabs.push({ id: newTabId, name: '常用' });
+        return newTabId;
+      };
+
+      const commonTabId = getOrCreateCommonTab();
+      const targetLower = path.toLowerCase();
+
+      if (checkbox.checked) {
+        // Add to config.items if not present
+        const exists = config.items.some(item => 
+          item.tabId === commonTabId && 
+          (item.path.toLowerCase() === targetLower || item.path.toLowerCase().endsWith('\\' + targetLower))
+        );
+        if (!exists) {
+          // Fetch system icon async
+          checkbox.disabled = true;
+          try {
+            const iconDataUrl = await window.api.getFileIcon(path);
+            config.items.push({
+              id: 'win-app-' + path.replace('.', '-') + '-' + Date.now(),
+              tabId: commonTabId,
+              name: name,
+              path: path,
+              args: '',
+              runAsAdmin: false,
+              icon: iconDataUrl
+            });
+          } catch (err) {
+            console.error('Failed to get icon for ' + path, err);
+            // Fallback icon
+            config.items.push({
+              id: 'win-app-' + path.replace('.', '-') + '-' + Date.now(),
+              tabId: commonTabId,
+              name: name,
+              path: path,
+              args: '',
+              runAsAdmin: false,
+              icon: ''
+            });
+          } finally {
+            checkbox.disabled = false;
+          }
+        }
+      } else {
+        // Remove from config.items
+        config.items = config.items.filter(item => 
+          !(item.tabId === commonTabId && 
+            (item.path.toLowerCase() === targetLower || item.path.toLowerCase().endsWith('\\' + targetLower)))
+        );
+      }
+    });
   });
 
   // Footer Save
