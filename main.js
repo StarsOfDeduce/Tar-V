@@ -464,41 +464,79 @@ ipcMain.handle('open-settings-window', () => {
   });
 });
 
+// In-memory icon cache to optimize icon loading speed
+const iconCache = new Map();
+
+// Concurrency queue for PowerShell icon extraction to prevent system freezing
+let activePowerShellCount = 0;
+const powershellQueue = [];
+
+function runNextPowerShell() {
+  if (powershellQueue.length === 0 || activePowerShellCount >= 3) {
+    return;
+  }
+  
+  activePowerShellCount++;
+  const { task, resolve, reject } = powershellQueue.shift();
+  
+  task()
+    .then(resolve)
+    .catch(reject)
+    .finally(() => {
+      activePowerShellCount--;
+      runNextPowerShell();
+    });
+}
+
+function queuePowerShell(task) {
+  return new Promise((resolve, reject) => {
+    powershellQueue.push({ task, resolve, reject });
+    runNextPowerShell();
+  });
+}
+
 // Helper to extract PE icon using PowerShell and .NET System.Drawing
 function extractIconWithPowerShell(targetPath) {
-  return new Promise((resolve, reject) => {
-    const escapedPath = targetPath.replace(/'/g, "''"); // escape single quotes for powershell
-    const psScript = `
-      Add-Type -AssemblyName System.Drawing;
-      $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('${escapedPath}');
-      if ($icon) {
-        $bitmap = $icon.ToBitmap();
-        $stream = New-Object System.IO.MemoryStream;
-        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png);
-        $bytes = $stream.ToArray();
-        $base64 = [Convert]::ToBase64String($bytes);
-        Write-Output $base64;
-      }
-    `;
-    
-    const command = psScript.replace(/\n/g, ' ').trim();
-    exec(`powershell -Command "${command}"`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(stdout.trim());
-      }
+  return queuePowerShell(() => {
+    return new Promise((resolve, reject) => {
+      const escapedPath = targetPath.replace(/'/g, "''"); // escape single quotes for powershell
+      const psScript = `
+        Add-Type -AssemblyName System.Drawing;
+        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('${escapedPath}');
+        if ($icon) {
+          $bitmap = $icon.ToBitmap();
+          $stream = New-Object System.IO.MemoryStream;
+          $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png);
+          $bytes = $stream.ToArray();
+          $base64 = [Convert]::ToBase64String($bytes);
+          Write-Output $base64;
+        }
+      `;
+      
+      const command = psScript.replace(/\n/g, ' ').trim();
+      exec(`powershell -NoProfile -NonInteractive -Command "${command}"`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(stdout.trim());
+        }
+      });
     });
   });
 }
 
 // Get high-res icon for a path
-ipcMain.handle('get-file-icon', async (event, filePath) => {
+ipcMain.handle('get-file-icon', async (event, filePath, forceRefresh = false) => {
   if (!filePath) return FALLBACK_ICONS.file;
   
   // Handle URLs
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     return FALLBACK_ICONS.web;
+  }
+
+  // Check cache unless a force refresh is requested (e.g. from maintenance UI)
+  if (!forceRefresh && iconCache.has(filePath)) {
+    return iconCache.get(filePath);
   }
 
   // Resolve environment variables and path commands to get native icon
@@ -527,6 +565,7 @@ ipcMain.handle('get-file-icon', async (event, filePath) => {
 
   // Fallback to PowerShell if the returned icon is the generic exe placeholder on Windows
   const isGeneric = !iconUrl || 
+                    iconUrl === FALLBACK_ICONS.file ||
                     (iconUrl.length >= 1200 && iconUrl.length <= 1300) || 
                     iconUrl.includes('iVBORw0KGgoAAAQCAYAAAAgCAY');
   
@@ -540,6 +579,9 @@ ipcMain.handle('get-file-icon', async (event, filePath) => {
       console.error('PowerShell icon extraction failed for:', cleanPath, err.message);
     }
   }
+
+  // Save to cache
+  iconCache.set(filePath, iconUrl);
 
   return iconUrl;
 });
@@ -774,20 +816,73 @@ ipcMain.handle('get-folder-files', async (event, folderPath) => {
   }
 });
 
-// Resolve windows .lnk shortcuts target
+// Resolve windows .lnk and .url shortcuts target
 ipcMain.handle('resolve-shortcut', (event, filePath) => {
-  if (filePath && filePath.toLowerCase().endsWith('.lnk')) {
+  if (!filePath) return { target: '', args: '', cwd: '', iconPath: '' };
+  
+  const lowerPath = filePath.toLowerCase();
+  
+  if (lowerPath.endsWith('.lnk')) {
     try {
       const shortcut = shell.readShortcutLink(filePath);
       return {
         target: shortcut.target || filePath,
         args: shortcut.args || '',
-        cwd: shortcut.cwd || ''
+        cwd: shortcut.cwd || '',
+        iconPath: ''
       };
     } catch (err) {
       console.error('Failed to resolve shortcut link:', err);
-      return { target: filePath || '', args: '', cwd: '' };
+      return { target: filePath, args: '', cwd: '', iconPath: '' };
     }
   }
-  return { target: filePath || '', args: '', cwd: '' };
+  
+  if (lowerPath.endsWith('.url')) {
+    try {
+      let content = '';
+      const buffer = fs.readFileSync(filePath);
+      // Detect UTF-16 LE BOM (0xFF 0xFE)
+      if (buffer[0] === 0xff && buffer[1] === 0xfe) {
+        content = buffer.toString('utf16le');
+      } else {
+        content = buffer.toString('utf-8');
+      }
+      
+      // Parse URL key
+      const urlMatch = content.match(/URL=(.+)/i);
+      const target = urlMatch ? urlMatch[1].trim() : filePath;
+      
+      // Parse IconFile key
+      const iconFileMatch = content.match(/IconFile=(.+)/i);
+      let iconPath = iconFileMatch ? iconFileMatch[1].trim() : '';
+      
+      // Expand environment variables in iconPath if any
+      if (iconPath) {
+        iconPath = iconPath.replace(/%([^%]+)%/g, (_, n) => process.env[n] || `%${n}%`);
+        if (iconPath.startsWith('"') && iconPath.endsWith('"')) {
+          iconPath = iconPath.slice(1, -1);
+        }
+        // Strip index if present, e.g. "C:\path\to\icon.ico,0"
+        const lastCommaIdx = iconPath.lastIndexOf(',');
+        if (lastCommaIdx !== -1) {
+          const suffix = iconPath.substring(lastCommaIdx + 1);
+          if (/^-?\d+$/.test(suffix.trim())) {
+            iconPath = iconPath.substring(0, lastCommaIdx).trim();
+          }
+        }
+      }
+      
+      return {
+        target: target,
+        args: '',
+        cwd: '',
+        iconPath: iconPath
+      };
+    } catch (err) {
+      console.error('Failed to resolve URL shortcut:', err);
+      return { target: filePath, args: '', cwd: '', iconPath: '' };
+    }
+  }
+  
+  return { target: filePath, args: '', cwd: '', iconPath: '' };
 });

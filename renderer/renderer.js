@@ -5,6 +5,7 @@ let selectedItemId = null;
 let isBatchMode = false;
 let selectedItemsForBatch = new Set();
 let draggedItemId = null;
+let draggedTabId = null;
 
 // Dictionary for multi-language translation (Req 34)
 const TRANSLATIONS = {
@@ -712,6 +713,54 @@ function renderTabs() {
       renameTab(tab.id);
     });
 
+    // Make tabs exchangeable (reorderable by drag-and-drop) (Req 2)
+    tabEl.setAttribute('draggable', 'true');
+    
+    tabEl.addEventListener('dragstart', (e) => {
+      draggedTabId = tab.id;
+      e.dataTransfer.setData('text/plain', tab.id);
+      tabEl.classList.add('tab-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tabEl.addEventListener('dragend', () => {
+      tabEl.classList.remove('tab-dragging');
+      tabsList.querySelectorAll('.tab-item').forEach(el => {
+        el.classList.remove('tab-drag-over');
+      });
+      draggedTabId = null;
+    });
+
+    tabEl.addEventListener('dragover', (e) => {
+      if (draggedTabId && draggedTabId !== tab.id) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        tabEl.classList.add('tab-drag-over');
+      }
+    });
+
+    tabEl.addEventListener('dragleave', () => {
+      tabEl.classList.remove('tab-drag-over');
+    });
+
+    tabEl.addEventListener('drop', async (e) => {
+      if (!draggedTabId || draggedTabId === tab.id) return;
+      e.preventDefault();
+      
+      const draggedIdx = config.tabs.findIndex(t => t.id === draggedTabId);
+      const targetIdx = config.tabs.findIndex(t => t.id === tab.id);
+      
+      if (draggedIdx !== -1 && targetIdx !== -1) {
+        const draggedTab = config.tabs[draggedIdx];
+        config.tabs.splice(draggedIdx, 1);
+        config.tabs.splice(targetIdx, 0, draggedTab);
+        
+        await window.api.saveConfig(config);
+        renderTabs();
+      }
+      draggedTabId = null;
+    });
+
     tabsList.appendChild(tabEl);
   });
 }
@@ -911,6 +960,29 @@ function updateBatchActionBar() {
   }
 }
 
+function positionAndShowContextMenu(x, y) {
+  contextMenu.style.display = 'block';
+  const menuWidth = contextMenu.offsetWidth || 170;
+  const menuHeight = contextMenu.offsetHeight || 200;
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  let adjustedX = x;
+  let adjustedY = y;
+  
+  if (x + menuWidth > windowWidth) {
+    adjustedX = windowWidth - menuWidth - 8;
+  }
+  if (y + menuHeight > windowHeight) {
+    adjustedY = windowHeight - menuHeight - 8;
+  }
+  if (adjustedX < 8) adjustedX = 8;
+  if (adjustedY < 8) adjustedY = 8;
+  
+  contextMenu.style.left = `${adjustedX}px`;
+  contextMenu.style.top = `${adjustedY}px`;
+}
+
 function showCardContextMenu(itemId, x, y) {
   selectedItemId = itemId;
   
@@ -945,9 +1017,7 @@ function showCardContextMenu(itemId, x, y) {
     contextMenu.querySelector('[data-action="location"]').style.display = isUrl ? 'none' : 'flex';
   }
   
-  contextMenu.style.left = `${x}px`;
-  contextMenu.style.top = `${y}px`;
-  contextMenu.style.display = 'block';
+  positionAndShowContextMenu(x, y);
 }
 
 function showTabContextMenu(tabId, x, y) {
@@ -963,9 +1033,7 @@ function showTabContextMenu(tabId, x, y) {
       <span class="icon">❌</span> ${t.ctxTabDelete}
     </div>
   `;
-  contextMenu.style.left = `${x}px`;
-  contextMenu.style.top = `${y}px`;
-  contextMenu.style.display = 'block';
+  positionAndShowContextMenu(x, y);
 }
 
 function showBackgroundContextMenu(x, y) {
@@ -1002,9 +1070,7 @@ function showBackgroundContextMenu(x, y) {
     contextMenu.querySelector('[data-action="import-folder-bg"]').style.pointerEvents = 'none';
   }
 
-  contextMenu.style.left = `${x}px`;
-  contextMenu.style.top = `${y}px`;
-  contextMenu.style.display = 'block';
+  positionAndShowContextMenu(x, y);
 }
 
 async function addNewTab() {
@@ -1094,14 +1160,18 @@ async function batchImportFolder() {
       name = name.substring(0, name.lastIndexOf('.'));
     }
     
-    if (file.path.toLowerCase().endsWith('.lnk')) {
+    let iconPath = '';
+    if (file.path.toLowerCase().endsWith('.lnk') || file.path.toLowerCase().endsWith('.url')) {
       const resolved = await window.api.resolveShortcut(file.path);
       finalPath = resolved.target;
       finalArgs = resolved.args;
+      if (resolved.iconPath) {
+        iconPath = resolved.iconPath;
+      }
     }
     
     // Extract and cache icon
-    const iconDataUrl = await window.api.getFileIcon(finalPath);
+    const iconDataUrl = await window.api.getFileIcon(iconPath || finalPath);
     
     config.items.push({
       id: 'item-batch-' + Date.now() + '-' + i + '-' + Math.floor(Math.random()*1000),
@@ -1163,14 +1233,16 @@ async function saveItemDetails() {
   let targetPath = filePath;
   let targetArgs = args;
   
-  if (filePath.toLowerCase().endsWith('.lnk')) {
+  let iconPath = '';
+  if (filePath.toLowerCase().endsWith('.lnk') || filePath.toLowerCase().endsWith('.url')) {
     const resolved = await window.api.resolveShortcut(filePath);
     targetPath = resolved.target;
     if (resolved.args) targetArgs = resolved.args;
+    if (resolved.iconPath) iconPath = resolved.iconPath;
   }
   
   // Extract and cache icon
-  const iconDataUrl = await window.api.getFileIcon(targetPath);
+  const iconDataUrl = await window.api.getFileIcon(iconPath || targetPath);
   
   if (selectedItemId) {
     const item = config.items.find(i => i.id === selectedItemId);
@@ -1527,13 +1599,17 @@ function setupEventListeners() {
         dispName = originalName.substring(0, originalName.lastIndexOf('.'));
       }
       
-      if (targetPath.toLowerCase().endsWith('.lnk')) {
+      let iconPath = '';
+      if (targetPath.toLowerCase().endsWith('.lnk') || targetPath.toLowerCase().endsWith('.url')) {
         const resolved = await window.api.resolveShortcut(targetPath);
         targetPath = resolved.target;
         targetArgs = resolved.args;
+        if (resolved.iconPath) {
+          iconPath = resolved.iconPath;
+        }
       }
       
-      const iconDataUrl = await window.api.getFileIcon(targetPath);
+      const iconDataUrl = await window.api.getFileIcon(iconPath || targetPath);
       
       config.items.push({
         id: 'item-drop-' + Date.now() + '-' + i + '-' + Math.floor(Math.random() * 1000),
@@ -1550,8 +1626,22 @@ function setupEventListeners() {
     renderItems();
   });
 
-  tabsContainer.addEventListener('wheel', (e) => {
-    if (!config.settings.tabScroll || config.tabs.length <= 1) return;
+  document.addEventListener('wheel', (e) => {
+    if (!config || !config.settings || !config.settings.tabScroll || config.tabs.length <= 1) return;
+    
+    // Do not switch tabs if any modal/dialog is visible
+    if (editModal.style.display === 'flex' || 
+        (typeof batchEditModal !== 'undefined' && batchEditModal && batchEditModal.style.display === 'flex') ||
+        document.getElementById('dialog-modal').style.display === 'flex' ||
+        document.getElementById('prompt-modal').style.display === 'flex') {
+      return;
+    }
+
+    // Do not switch if scrolling inside a scrollable dropdown or input or batch-action-bar
+    if (e.target.closest('.dropdown-style') || e.target.closest('input') || e.target.closest('select') || e.target.closest('#batch-action-bar')) {
+      return;
+    }
+
     e.preventDefault();
 
     const idx = config.tabs.findIndex(t => t.id === activeTabId);
@@ -1566,7 +1656,7 @@ function setupEventListeners() {
     activeTabId = config.tabs[nextIdx].id;
     renderTabs();
     renderItems();
-  });
+  }, { passive: false });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
