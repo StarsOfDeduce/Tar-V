@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.2-blue?style=flat-square" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.3-blue?style=flat-square" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows" alt="platform">
   <img src="https://img.shields.io/badge/framework-Electron-47848F?style=flat-square&logo=electron" alt="electron">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license">
@@ -34,14 +34,14 @@ Tar V 是一款专为 Windows 打造的**毛玻璃拟物风快捷启动面板（
 
 ### 📂 原生系统图标提取
 
-完整保留 Windows 本地文件、文件夹和 `.lnk` 快捷方式的原始图标，不做多余滤镜与二次修改，确保最纯粹、最熟悉的辨识体验。
+完整保留 Windows 本地文件、文件夹、`.lnk` 以及 `.url`（如 Steam 游戏等 Internet 快捷方式）的原始图标，内置高效提取缓存及多进程并发队列控制器，保障应用界面顺滑加载。
 
 ### 🖱️ 拖拽添加与排序
 
-- **拖拽添加**：直接将文件、文件夹、网络 URL 或桌面快捷方式拖入面板即可一键创建卡片，自动解析 `.lnk` 的目标路径与运行参数。
-- **拖拽排序**：在面板内自由拖动图标卡片来调整顺序，支持两种模式：
-  - **排序式拖动（插入）**：将图标插入到目标位置前或后。
-  - **交换式拖动（对调）**：与目标图标直接互换位置。
+- **拖拽添加**：直接将文件、文件夹、网络 URL 或桌面快捷方式（`.lnk` / `.url`）拖入面板即可一键创建卡片，自动解析目标路径与运行参数。
+- **拖拽排序**：
+  - **图标卡片**：在面板内自由拖动卡片来调整顺序，支持排序式拖动（插入）与交换式拖动（对调）两种模式。
+  - **标签分组**：可直接在面板顶部拖动分类标签页来对调或重排它们的前后位置。
 
 ### 📦 批量管理
 
@@ -73,7 +73,7 @@ Tar V 是一款专为 Windows 打造的**毛玻璃拟物风快捷启动面板（
 | **外观** | 主题风格、网格列数、背景基色、高亮主题色、不透明度、圆角大小、隐藏名称、三组独立字体大小微调 |
 | **偏好** | 单击/双击运行模式、图标拖动模式、启动后自动收起、失焦自动收起 |
 | **唤出与收起** | 全局快捷键录制（支持 Alt / Ctrl / Shift 组合键）、ESC 键收起、面板唤出位置（屏幕中央 / 跟随鼠标） |
-| **切换标签** | 鼠标悬停切换、滚轮滚动切换、数字键 1-9 快速跳转 |
+| **切换标签** | 鼠标悬停切换、全局滚轮滚动切换（主页任意区域滚动即可切换）、数字键 1-9 快速跳转 |
 | **常用软件** | 内置常见 Windows 系统工具快捷开关（cmd、资源管理器、任务管理器、计算器、记事本、控制面板、注册表编辑器、设备管理器），勾选即自动添加至"常用"标签页 |
 | **维护** | 图标修复、排序、去重、死链扫描与清理、空标签清理 |
 | **备份与恢复** | 将当前所有配置导出为 `.json` 文件，或从备份文件一键恢复 |
@@ -128,7 +128,7 @@ npm run dist
 
 | 文件 | 说明 |
 |:---|:---|
-| `dist/Tar V Setup 1.0.2.exe` | NSIS 安装包（含桌面与开始菜单快捷方式，支持系统卸载） |
+| `dist/Tar V Setup 1.0.3.exe` | NSIS 安装包（含桌面与开始菜单快捷方式，支持系统卸载） |
 | `dist/win-unpacked/Tar V.exe` | 免安装解压版主程序 |
 
 > **💡 提示**：若需单文件便携绿色版，可将 `package.json` 中 `build.win.target` 的 `"nsis"` 改为 `"portable"` 后重新打包。

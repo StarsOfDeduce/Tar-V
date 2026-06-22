@@ -235,6 +235,17 @@ body {
   border-radius: 2px;
 }
 
+.tab-item.tab-dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--accent);
+}
+
+.tab-item.tab-drag-over {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 8px rgba(224, 79, 53, 0.3);
+  transform: scale(1.05);
+}
+
 .add-tab-btn {
   background: transparent;
   border: none;

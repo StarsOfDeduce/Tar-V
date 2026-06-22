@@ -61,7 +61,7 @@ window.addEventListener('drop', (e) => {
 contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-  getFileIcon: (filePath) => ipcRenderer.invoke('get-file-icon', filePath),
+  getFileIcon: (filePath, forceRefresh = false) => ipcRenderer.invoke('get-file-icon', filePath, forceRefresh),
   launchItem: (filePath, args, runAsAdmin) => ipcRenderer.invoke('launch-item', filePath, args, runAsAdmin),
   selectFile: () => ipcRenderer.invoke('select-file'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),

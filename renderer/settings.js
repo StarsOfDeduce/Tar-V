@@ -1151,7 +1151,7 @@ function setupEventListeners() {
     try {
       for (let i = 0; i < config.items.length; i++) {
         const item = config.items[i];
-        item.icon = await window.api.getFileIcon(item.path);
+        item.icon = await window.api.getFileIcon(item.path, true);
       }
       await window.api.saveConfig(config);
       await showCustomAlert(t.msg_repair_success);
