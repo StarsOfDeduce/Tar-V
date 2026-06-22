@@ -292,9 +292,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
+  justify-content: flex-start;
+  padding: 8px 4px;
+  box-sizing: border-box;
+  width: 88px;
+  height: calc(2.4 * var(--font-size-item, 13px) + 64px);
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -328,8 +330,8 @@ body {
 }
 
 .item-icon-wrapper {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -343,8 +345,8 @@ body {
 }
 
 .item-icon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
 }
 
@@ -352,12 +354,17 @@ body {
   margin-top: 6px;
   font-size: var(--font-size-item, 13px);
   color: var(--text-primary);
-  width: 85%;
+  width: 100%;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.2;
+  font-weight: 400;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 400;
 }
 
 .item-search-tab {
