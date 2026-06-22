@@ -598,6 +598,87 @@ function lightenColor(hex, percent) {
   return "#" + (0x1000000 + (R < 255 ? R < 0 ? 0 : R : 255) * 0x10000 + (G < 255 ? G < 0 ? 0 : G : 255) * 0x100 + (B < 255 ? B < 0 ? 0 : B : 255)).toString(16).slice(1);
 }
 
+function getVisualLength(str) {
+  let len = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if ((code >= 0x4e00 && code <= 0x9fff) || 
+        (code >= 0x3400 && code <= 0x4dbf) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xff00 && code <= 0xffef) ||
+        (code >= 0x3000 && code <= 0x303f)) {
+      len += 1.0;
+    } else {
+      len += 0.5;
+    }
+  }
+  return len;
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function hasCJK(str) {
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if ((code >= 0x4e00 && code <= 0x9fff) || 
+        (code >= 0x3400 && code <= 0x4dbf) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xff00 && code <= 0xffef) ||
+        (code >= 0x3000 && code <= 0x303f)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function formatItemName(name) {
+  if (!name) return '';
+  const escapedName = escapeHTML(name);
+  const visualLen = getVisualLength(name);
+  if (visualLen <= 5.0) {
+    return `<div class="name-line">${escapedName}</div>`;
+  }
+  const containsCJK = hasCJK(name);
+  if (containsCJK) {
+    const L = name.length;
+    const A = Math.floor(L / 2);
+    const part1 = name.substring(0, A);
+    const part2 = name.substring(A);
+    return `<div class="name-line">${escapeHTML(part1)}</div><div class="name-line">${escapeHTML(part2)}</div>`;
+  } else {
+    if (name.includes(' ')) {
+      const words = name.trim().split(/\s+/);
+      if (words.length > 1) {
+        let minDiff = Infinity;
+        let splitIdx = 1;
+        for (let i = 1; i < words.length; i++) {
+          const part1 = words.slice(0, i).join(' ');
+          const part2 = words.slice(i).join(' ');
+          const len1 = getVisualLength(part1);
+          const len2 = getVisualLength(part2);
+          const diff = Math.abs(len1 - len2);
+          if (diff < minDiff) {
+            minDiff = diff;
+            splitIdx = i;
+          }
+        }
+        const part1 = words.slice(0, splitIdx).join(' ');
+        const part2 = words.slice(splitIdx).join(' ');
+        return `<div class="name-line">${escapeHTML(part1)}</div><div class="name-line">${escapeHTML(part2)}</div>`;
+      }
+    }
+    return `<div class="name-line">${escapedName}</div>`;
+  }
+}
+
 function renderTabs() {
   tabsList.innerHTML = '';
   config.tabs.forEach(tab => {
@@ -697,7 +778,7 @@ async function renderItems(query = '') {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'item-name';
-    nameSpan.textContent = item.name;
+    nameSpan.innerHTML = formatItemName(item.name);
     card.appendChild(nameSpan);
 
     if (isSearch) {

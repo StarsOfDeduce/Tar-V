@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.1-blue?style=flat-square" alt="version">
+  <img src="https://img.shields.io/badge/version-1.0.2-blue?style=flat-square" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows" alt="platform">
   <img src="https://img.shields.io/badge/framework-Electron-47848F?style=flat-square&logo=electron" alt="electron">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license">
@@ -128,7 +128,7 @@ npm run dist
 
 | 文件 | 说明 |
 |:---|:---|
-| `dist/Tar V Setup 1.0.1.exe` | NSIS 安装包（含桌面与开始菜单快捷方式，支持系统卸载） |
+| `dist/Tar V Setup 1.0.2.exe` | NSIS 安装包（含桌面与开始菜单快捷方式，支持系统卸载） |
 | `dist/win-unpacked/Tar V.exe` | 免安装解压版主程序 |
 
 > **💡 提示**：若需单文件便携绿色版，可将 `package.json` 中 `build.win.target` 的 `"nsis"` 改为 `"portable"` 后重新打包。
