@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "test": "node test/security.test.js"
   },
   "build": {
     "appId": "com.starsofdeduce.tarv",
@@ -26,6 +27,7 @@
       "main.js",
       "preload.js",
       "tray.png",
+      "lib/**/*",
       "renderer/**/*",
       "package.json"
     ],
@@ -38,7 +40,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^42.4.1",
+    "electron": "^42.11.15",
     "electron-builder": "^26.15.3"
   }
 }
