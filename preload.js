@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('api', {
   centerWindow: () => ipcRenderer.invoke('center-window'),
   exportConfig: () => ipcRenderer.invoke('export-config'),
   importConfig: () => ipcRenderer.invoke('import-config'),
+  confirmImport: (accept) => ipcRenderer.invoke('confirm-import-config', accept),
   getFolderFiles: (folderPath) => ipcRenderer.invoke('get-folder-files', folderPath),
   resolveShortcut: (filePath) => ipcRenderer.invoke('resolve-shortcut', filePath),
   

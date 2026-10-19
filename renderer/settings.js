@@ -1290,11 +1290,48 @@ function setupEventListeners() {
     const lang = config.settings.language || 'zh';
     const t = TRANSLATIONS[lang] || TRANSLATIONS.zh;
     const res = await window.api.importConfig();
-    if (res && res.success) {
-      window.close(); // Close settings window immediately (Req 37)
-    } else if (res) {
+
+    if (!res) return; // 用户取消选择文件
+
+    if (!res.success) {
       await showCustomAlert(t.msg_import_fail + res.error);
+      return;
     }
+
+    // 导入内容已通过校验，但危险设置（自启动、热键、管理员启动项）
+    // 必须先展示给用户确认，确认后才真正落盘并生效。
+    if (res.requiresConfirmation) {
+      const lines = [];
+      lines.push(lang === 'zh' ? '即将导入以下配置：' : 'The following configuration will be imported:');
+      lines.push('');
+      (res.summary || []).forEach(line => lines.push(line));
+
+      if (res.warnings && res.warnings.length > 0) {
+        lines.push('');
+        lines.push(lang === 'zh' ? '以下字段已被忽略：' : 'The following fields were ignored:');
+        res.warnings.slice(0, 5).forEach(w => lines.push('· ' + w));
+        if (res.warnings.length > 5) {
+          lines.push('· ...');
+        }
+      }
+
+      lines.push('');
+      lines.push(lang === 'zh' ? '确认应用这份配置吗？' : 'Apply this configuration?');
+
+      const confirmed = await showCustomConfirm(lines.join('\n'));
+      const applied = await window.api.confirmImport(confirmed === true);
+
+      if (!applied || !applied.success) {
+        await showCustomAlert(t.msg_import_fail + (applied ? applied.error : ''));
+        return;
+      }
+      if (applied.applied) {
+        window.close(); // Close settings window immediately (Req 37)
+      }
+      return;
+    }
+
+    window.close();
   });
   
   // Close window on Escape key

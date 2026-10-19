@@ -1,12 +1,28 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, dialog, shell, screen, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { exec, spawn } = require('child_process');
+const { spawn } = require('child_process');
+
+const { parseWindowsArgs } = require('./lib/args');
+const {
+  runEncodedPowerShell,
+  startProcess,
+  buildIconExtractScript
+} = require('./lib/powershell');
+const { launchBatchFile } = require('./lib/launch');
+const { createDirAuthorizer, hasTraversal } = require('./lib/path-guard');
+const { validateConfig } = require('./lib/config-schema');
 
 let win = null;
 let settingsWin = null; // Independent Settings Window
 let tray = null;
 let currentConfig = null;
+
+// 待确认的导入配置：校验通过后先暂存，等用户在界面上二次确认再应用
+let pendingImport = null;
+
+// 会话级目录授权表：只有用户通过系统对话框亲自选择的目录才允许被枚举
+const dirAuthorizer = createDirAuthorizer([app.getPath('userData')]);
 
 // Base64 verified 16x16 PNG for System Tray (Windows requires raster formats like PNG/ICO, SVG fails in shell tray)
 const TRAY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAd0lEQVQ4T6WTwREAIAgDscRO7MQS7sQSVsAHF05y8EnkLyHAEhKcc855GQeICJd1gIiI3AAR4bIOEBGRGyAiXNYBIiJyA0SEyzpARETuiWdmzszsNzOzZ+bMnvh95q98f/n+8tP5P50vIvx0vjOzZ2b2mxm/z/wB5j57AgvUTjIAAAAASUVORK5CYII=';
@@ -165,7 +181,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false // Sandbox MUST be false to allow access to file.path in drag and drop files
+      // 沙箱开启后渲染进程与 preload 运行在受限环境，无法直接触达 Node.js。
+      // 拖放文件的真实路径通过 preload 里的 webUtils.getPathForFile 获取，
+      // 不再依赖被沙箱移除的 File.path，因此功能不受影响。
+      sandbox: true
     }
   });
 
@@ -428,7 +447,7 @@ ipcMain.handle('open-settings-window', () => {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: true
     }
   });
   
@@ -497,31 +516,14 @@ function queuePowerShell(task) {
 
 // Helper to extract PE icon using PowerShell and .NET System.Drawing
 function extractIconWithPowerShell(targetPath) {
-  return queuePowerShell(() => {
-    return new Promise((resolve, reject) => {
-      const escapedPath = targetPath.replace(/'/g, "''"); // escape single quotes for powershell
-      const psScript = `
-        Add-Type -AssemblyName System.Drawing;
-        $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('${escapedPath}');
-        if ($icon) {
-          $bitmap = $icon.ToBitmap();
-          $stream = New-Object System.IO.MemoryStream;
-          $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png);
-          $bytes = $stream.ToArray();
-          $base64 = [Convert]::ToBase64String($bytes);
-          Write-Output $base64;
-        }
-      `;
-      
-      const command = psScript.replace(/\n/g, ' ').trim();
-      exec(`powershell -NoProfile -NonInteractive -Command "${command}"`, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(stdout.trim());
-        }
-      });
-    });
+  return queuePowerShell(async () => {
+    // 脚本以 Base64 传入（-EncodedCommand），不经过 cmd.exe，也不拼接命令字符串，
+    // 因此路径中的引号、反引号、分号等字符都无法跳出参数边界。
+    const result = await runEncodedPowerShell(buildIconExtractScript(targetPath));
+    if (result.code !== 0) {
+      throw new Error(result.stderr || `PowerShell 退出码 ${result.code}`);
+    }
+    return result.stdout;
   });
 }
 
@@ -586,16 +588,21 @@ ipcMain.handle('get-file-icon', async (event, filePath, forceRefresh = false) =>
   return iconUrl;
 });
 
+// 判断是否为"系统命令引用"（例如 cmd.exe 这类相对名），交给系统按 PATH 解析
+function isSystemCommandRef(cleanPath) {
+  return !path.isAbsolute(cleanPath) && !fs.existsSync(cleanPath);
+}
+
 // Launch item
 ipcMain.handle('launch-item', async (event, filePath, args, runAsAdmin) => {
-  if (!filePath) {
+  if (!filePath || typeof filePath !== 'string') {
     return { success: false, error: '启动路径为空' };
   }
   const config = loadConfig();
   
   try {
     // Handle Web URLs
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    if (/^https?:\/\//i.test(filePath)) {
       await shell.openExternal(filePath);
       if (config.settings.autoHideOnLaunch) {
         hideWindow();
@@ -605,45 +612,46 @@ ipcMain.handle('launch-item', async (event, filePath, args, runAsAdmin) => {
 
     // Standard Files and Commands
     const cleanPath = resolveAbsolutePath(filePath);
-    const isRelativeOrSystem = !path.isAbsolute(cleanPath) && !fs.existsSync(cleanPath);
+    const isCommandRef = isSystemCommandRef(cleanPath);
     
-    if (!isRelativeOrSystem && !fs.existsSync(cleanPath)) {
+    if (!isCommandRef && !fs.existsSync(cleanPath)) {
       throw new Error(`路径不存在: "${cleanPath}"`);
     }
 
-    if (runAsAdmin) {
-      await new Promise((resolve, reject) => {
-        // PowerShell verb RunAs to request admin rights
-        const escapedPath = cleanPath.replace(/"/g, '`"');
-        const escapedArgs = args ? args.replace(/"/g, '`"') : '';
-        const command = `Start-Process "${escapedPath}" ${args ? `-ArgumentList "${escapedArgs}"` : ''} -Verb RunAs`;
-        
-        exec(`powershell -Command "${command}"`, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+    // 参数按 Windows 命令行规则拆分为数组，后续全程不经过任何 shell
+    const argList = parseWindowsArgs(typeof args === 'string' ? args : '');
+    const extension = path.extname(cleanPath).toLowerCase();
+    const isBatchFile = extension === '.bat' || extension === '.cmd';
+
+    if (isBatchFile) {
+      // .bat / .cmd 需要命令解释器承载，参数按 cmd 规则转义后执行
+      await launchBatchFile(cleanPath, argList, { runAsAdmin: runAsAdmin === true });
+    } else if (runAsAdmin) {
+      // 提权只能通过 ShellExecute 的 RunAs 动词，参数以 CreateProcess 规则编码
+      await startProcess(cleanPath, argList, { runAsAdmin: true });
+    } else if (argList.length > 0) {
+      // 有参数：直接以进程方式启动，参数数组原样交给 CreateProcess
+      const child = spawn(cleanPath, argList, {
+        detached: true,
+        stdio: 'ignore',
+        shell: false,
+        windowsHide: true
       });
+      child.on('error', (err) => console.error('Launch failed (spawn):', err));
+      child.unref();
     } else {
-      if (args) {
-        // Launch with arguments using spawn in detached mode
-        const child = spawn(cleanPath, [args], {
+      // 无参数：优先交给系统外壳，保留文件关联行为
+      const err = await shell.openPath(cleanPath);
+      if (err) {
+        // 外壳无法处理时（例如系统目录下的命令）退回直接启动进程
+        const child = spawn(cleanPath, [], {
           detached: true,
           stdio: 'ignore',
-          shell: true
+          shell: false,
+          windowsHide: true
         });
+        child.on('error', (spawnErr) => console.error('Launch failed (fallback):', spawnErr));
         child.unref();
-      } else {
-        // Launch using shell open
-        const err = await shell.openPath(cleanPath);
-        if (err) {
-          // Fallback to start cmd if shell fails (e.g. system directories or commands)
-          await new Promise((resolve, reject) => {
-            exec(`start "" "${cleanPath}"`, { shell: true }, (error) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          });
-        }
       }
     }
 
@@ -666,6 +674,9 @@ ipcMain.handle('select-file', async (event) => {
   });
   
   if (result.canceled || result.filePaths.length === 0) return null;
+
+  // 用户亲自选中的文件所在目录，加入本次会话的授权范围
+  dirAuthorizer.allowParentOf(result.filePaths[0]);
   return result.filePaths[0];
 });
 
@@ -678,6 +689,9 @@ ipcMain.handle('select-folder', async (event) => {
   });
   
   if (result.canceled || result.filePaths.length === 0) return null;
+
+  // 只有用户亲自选择的目录才允许后续被枚举
+  dirAuthorizer.allow(result.filePaths[0]);
   return result.filePaths[0];
 });
 
@@ -705,16 +719,30 @@ ipcMain.handle('register-shortcut', (event, accelerator) => {
 
 // Check file paths existence
 ipcMain.handle('check-paths', (event, paths) => {
-  return paths.map(p => {
-    if (!p) return false;
-    if (p.startsWith('http://') || p.startsWith('https://')) return true;
-    
-    // Relative / System commands like cmd.exe or explorer.exe
-    if (!path.isAbsolute(p)) {
-      return true; // We default to true for system command references to avoid delete scan errors
+  if (!Array.isArray(paths)) return [];
+
+  // 只回答"当前配置里确实存在的启动项路径"，避免该接口被当作任意文件系统探测器
+  const config = loadConfig();
+  const knownPaths = new Set(
+    (Array.isArray(config.items) ? config.items : [])
+      .filter((item) => item && typeof item.path === 'string' && item.path.length > 0)
+      .map((item) => path.resolve(item.path))
+  );
+
+  return paths.map((p) => {
+    if (typeof p !== 'string' || p.length === 0) return false;
+    if (/^https?:\/\//i.test(p)) return true;
+
+    // 相对系统命令（如 cmd.exe）不做存在性探测，一律视为可用
+    if (!path.isAbsolute(p)) return true;
+
+    if (!knownPaths.has(path.resolve(p))) return false;
+
+    try {
+      return fs.existsSync(p);
+    } catch (err) {
+      return false;
     }
-    
-    return fs.existsSync(p);
   });
 });
 
@@ -753,7 +781,7 @@ ipcMain.handle('export-config', async (event) => {
   }
 });
 
-// Import Config
+// Import Config — 第一步：读取 + 校验，暂存待确认
 ipcMain.handle('import-config', async (event) => {
   const senderWindow = BrowserWindow.fromWebContents(event.sender) || win;
   const result = await dialog.showOpenDialog(senderWindow, {
@@ -765,43 +793,97 @@ ipcMain.handle('import-config', async (event) => {
   if (result.canceled || result.filePaths.length === 0) return null;
 
   try {
-    const data = fs.readFileSync(result.filePaths[0], 'utf-8');
-    const newConfig = JSON.parse(data);
-    
-    if (!newConfig.settings || !Array.isArray(newConfig.tabs) || !Array.isArray(newConfig.items)) {
-      throw new Error('无效的配置文件格式！必须包含 settings、tabs 和 items 字段。');
+    const fileStat = fs.statSync(result.filePaths[0]);
+    if (fileStat.size > 8 * 1024 * 1024) {
+      throw new Error('配置文件过大（上限 8MB）');
     }
 
-    saveConfigSync(newConfig);
-    
-    // Apply key settings immediately
-    registerGlobalShortcut(newConfig.settings.hotkey);
-    app.setLoginItemSettings({
-      openAtLogin: newConfig.settings.autostart,
-      path: app.getPath('exe'),
-      args: ['--hidden']
-    });
-    
-    // Refresh web contents
-    win.reload();
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.send('show-import-success');
-    });
-    return { success: true };
+    const data = fs.readFileSync(result.filePaths[0], 'utf-8');
+    const parsed = JSON.parse(data);
+
+    // 字段与类型白名单校验：未知字段、超长字段、悬空引用一律拒绝
+    const validation = validateConfig(parsed);
+    if (!validation.ok) {
+      return { success: false, error: validation.errors.slice(0, 8).join('；') };
+    }
+
+    // 不落盘、不生效，先暂存等待用户二次确认
+    pendingImport = { config: validation.value, sourcePath: result.filePaths[0] };
+
+    return {
+      success: true,
+      requiresConfirmation: true,
+      summary: validation.summary,
+      warnings: validation.warnings
+    };
   } catch (err) {
     return { success: false, error: err.message };
   }
 });
 
+// Import Config — 第二步：用户确认后才真正应用
+ipcMain.handle('confirm-import-config', async (event, accept) => {
+  if (!pendingImport) {
+    return { success: false, error: '没有待确认的导入配置' };
+  }
+
+  if (accept !== true) {
+    pendingImport = null;
+    return { success: true, applied: false };
+  }
+
+  const importedConfig = pendingImport.config;
+  pendingImport = null;
+
+  saveConfigSync(importedConfig);
+
+  // 自启动与全局热键属于危险设置，只在确认后应用
+  registerGlobalShortcut(importedConfig.settings.hotkey);
+  app.setLoginItemSettings({
+    openAtLogin: importedConfig.settings.autostart === true,
+    path: app.getPath('exe'),
+    args: ['--hidden']
+  });
+
+  if (win && !win.isDestroyed()) {
+    win.reload();
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.send('show-import-success');
+    });
+  }
+  return { success: true, applied: true };
+});
+
 // Get all files inside a folder (non-recursive) for batch importing
 ipcMain.handle('get-folder-files', async (event, folderPath) => {
   try {
+    if (typeof folderPath !== 'string' || folderPath.length === 0) {
+      return { success: false, error: '路径无效' };
+    }
+    if (!path.isAbsolute(folderPath)) {
+      return { success: false, error: '只支持绝对路径' };
+    }
+    // 目录枚举是敏感操作：只允许用户通过「选择文件夹」对话框亲自授权过的目录
+    if (!dirAuthorizer.isAllowed(folderPath)) {
+      return { success: false, error: '该目录未获授权，请通过「文件夹」按钮重新选择' };
+    }
+
+    const folderStat = fs.statSync(folderPath);
+    if (!folderStat.isDirectory()) {
+      return { success: false, error: '目标不是文件夹' };
+    }
+
     const files = fs.readdirSync(folderPath);
     const result = [];
     
     for (const file of files) {
       const fullPath = path.join(folderPath, file);
-      const stat = fs.statSync(fullPath);
+      let stat;
+      try {
+        stat = fs.statSync(fullPath);
+      } catch (err) {
+        continue; // 跳过无权限或已失效的条目
+      }
       
       if (stat.isFile()) {
         result.push({
@@ -818,8 +900,26 @@ ipcMain.handle('get-folder-files', async (event, folderPath) => {
 
 // Resolve windows .lnk and .url shortcuts target
 ipcMain.handle('resolve-shortcut', (event, filePath) => {
-  if (!filePath) return { target: '', args: '', cwd: '', iconPath: '' };
-  
+  const fallback = { target: filePath || '', args: '', cwd: '', iconPath: '' };
+
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    return { target: '', args: '', cwd: '', iconPath: '' };
+  }
+  // 只解析真实存在的绝对路径，并拒绝路径穿越
+  if (!path.isAbsolute(filePath) || hasTraversal(filePath)) {
+    return fallback;
+  }
+
+  let fileStat;
+  try {
+    fileStat = fs.statSync(filePath);
+  } catch (err) {
+    return fallback;
+  }
+  if (!fileStat.isFile()) {
+    return fallback;
+  }
+
   const lowerPath = filePath.toLowerCase();
   
   if (lowerPath.endsWith('.lnk')) {
@@ -839,6 +939,11 @@ ipcMain.handle('resolve-shortcut', (event, filePath) => {
   
   if (lowerPath.endsWith('.url')) {
     try {
+      // .url 是纯文本文件，限制读取体积，避免被用来读取大文件
+      if (fileStat.size > 64 * 1024) {
+        return { target: filePath, args: '', cwd: '', iconPath: '' };
+      }
+
       let content = '';
       const buffer = fs.readFileSync(filePath);
       // Detect UTF-16 LE BOM (0xFF 0xFE)
