@@ -18,6 +18,24 @@
 
 ---
 
+## 📸 界面预览
+
+<p align="center">
+  <img src="docs/screenshots/panel.png" width="720" alt="主面板">
+  <br>
+  <sub>主面板 · 分组标签、搜索框与系统原生图标</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="620" alt="设置中心">
+  <br>
+  <sub>独立设置中心 · 8 个功能分区</sub>
+</p>
+
+> 截图使用 Windows 系统自带程序作为演示数据，不含任何个人文件或路径。
+
+---
+
 ## 📖 简介
 
 Tar V 是一款专为 Windows 打造的**毛玻璃拟物风快捷启动面板（Launcher）**。
@@ -76,7 +94,7 @@ Tar V 是一款专为 Windows 打造的**毛玻璃拟物风快捷启动面板（
 | **切换标签** | 鼠标悬停切换、全局滚轮滚动切换（主页任意区域滚动即可切换）、数字键 1-9 快速跳转 |
 | **常用软件** | 内置常见 Windows 系统工具快捷开关（cmd、资源管理器、任务管理器、计算器、记事本、控制面板、注册表编辑器、设备管理器），勾选即自动添加至"常用"标签页 |
 | **维护** | 图标修复、排序、去重、死链扫描与清理、空标签清理 |
-| **备份与恢复** | 将当前所有配置导出为 `.json` 文件，或从备份文件一键恢复 |
+| **备份与恢复** | 将当前所有配置导出为 `.json` 文件，或从备份文件一键恢复（导入前会展示变更摘要并要求确认） |
 
 ### 💬 深度美化的弹窗与交互
 
@@ -88,14 +106,34 @@ Tar V 是一款专为 Windows 打造的**毛玻璃拟物风快捷启动面板（
 
 ---
 
+## 🔒 安全设计
+
+Tar V 会启动本机程序、读取文件图标、解析快捷方式，这些能力天然贴近系统边界。项目在以下方面做了约束：
+
+| 方面 | 做法 |
+|:---|:---|
+| **启动参数** | 运行参数按 Windows 命令行规则拆分为数组后直接交给系统创建进程，不经过任何 shell；批处理文件按 cmd 规则单独转义 |
+| **管理员启动** | 仅通过系统提权接口触发 UAC，参数以字面量传递，不做命令字符串拼接 |
+| **外部命令调用** | 调用 PowerShell 时使用 `-EncodedCommand` 传参，命令内容不经过 cmd.exe，路径与参数不会被二次解析 |
+| **渲染进程隔离** | 开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`，页面无法直接触达 Node.js |
+| **内容安全策略** | 主面板与设置页均启用严格 CSP，禁止远程脚本、内联脚本与内联事件处理器 |
+| **字体资源** | Inter 字体随包分发，不请求任何远程 CDN |
+| **配置导入** | 导入的 JSON 经过字段白名单与类型校验，自启动、热键、管理员启动项等危险变更会先展示摘要并要求确认 |
+| **IPC 边界** | 目录枚举仅限用户通过系统对话框亲自选择的目录；路径存在性检查只针对当前配置中的条目 |
+
+如需报告安全问题，请通过仓库的 Issue 或 Security Advisory 联系，请勿公开披露可利用细节。
+
+---
+
 ## 🚀 开发者指南
 
 如果您希望从源码运行或二次开发 Tar V，请参照以下步骤。
 
 ### 环境要求
 
-- [Node.js](https://nodejs.org/) **LTS 版本**（推荐 v18+）
+- [Node.js](https://nodejs.org/) **LTS 版本**（推荐 v20+）
 - npm（随 Node.js 一同安装）
+- Windows 10 / 11
 
 ### 1. 克隆仓库
 
@@ -118,7 +156,23 @@ npm start
 
 Electron 窗口将自动拉起，代码修改后重启即可实时预览。
 
-### 4. 打包发布
+### 4. 运行测试
+
+```bash
+npm test
+```
+
+包含安全工具函数与启动链路的自动化测试（参数拆分、cmd 转义、路径边界、配置校验、注入载荷拦截）。
+
+渲染层冒烟测试需要 Electron 环境：
+
+```bash
+npx electron test/renderer-smoke.js --disable-gpu --no-sandbox
+```
+
+它会校验两个页面在沙箱与严格 CSP 下能否正常加载、preload 桥接是否可用、本地字体是否生效，以及控制台有无 CSP 违规。
+
+### 5. 打包发布
 
 ```bash
 npm run dist
@@ -139,19 +193,28 @@ npm run dist
 
 ```
 tar-v/
-├── main.js              # Electron 主进程
-├── preload.js           # 预加载脚本（IPC 桥接与安全沙箱）
-├── tray.png             # 应用图标与系统托盘图标
-├── package.json         # 项目配置与构建设定
-├── LICENSE              # MIT 开源许可证
-├── README.md            # 本文档
-└── renderer/            # 渲染进程资源
-    ├── index.html        # 主面板页面
-    ├── index.css         # 主面板样式
-    ├── renderer.js       # 主面板逻辑（渲染、拖拽、右键菜单等）
-    ├── settings.html     # 设置中心页面
-    ├── settings.css      # 设置中心样式
-    └── settings.js       # 设置中心逻辑
+├── main.js                  # Electron 主进程（窗口、托盘、IPC）
+├── preload.js               # 预加载脚本（IPC 桥接、拖放路径解析）
+├── lib/                     # 与 Electron 解耦、可单独测试的核心逻辑
+│   ├── args.js              #   命令行参数解析与转义
+│   ├── powershell.js        #   安全的外部命令调用
+│   ├── launch.js            #   批处理启动链路
+│   ├── path-guard.js        #   路径边界校验
+│   └── config-schema.js     #   配置导入校验
+├── renderer/                # 渲染进程资源
+│   ├── index.html           #   主面板页面
+│   ├── index.css            #   主面板样式（含本地字体声明）
+│   ├── renderer.js          #   主面板逻辑
+│   ├── settings.html        #   设置中心页面
+│   ├── settings.js          #   设置中心逻辑
+│   └── fonts/               #   Inter 字体（本地分发）
+├── test/                    # 自动化测试
+├── scripts/                 # 开发辅助脚本（截图生成等）
+├── docs/screenshots/        # README 用截图
+├── tray.png                 # 应用图标与系统托盘图标
+├── package.json             # 项目配置与构建设定
+├── LICENSE                  # MIT 开源许可证
+└── README.md                # 本文档
 ```
 
 ---
