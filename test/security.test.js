@@ -299,13 +299,15 @@ test('重复的 tab 和 item ID 被拒绝', () => {
 // ---------------------------------------------------------------- launch-policy
 console.log('\n[lib/launch-policy]');
 
-test('启动时只从当前配置按 ID 取路径与参数', () => {
+test('启动时只从当前配置按 ID 取真实路径与参数', () => {
   const cfg = baseConfig();
   const result = selectConfiguredLaunch(cfg, 'i1');
   assert.strictEqual(result.ok, true);
   assert.deepStrictEqual(result.item, {
-    id: 'i1', path: 'cmd.exe', args: '', runAsAdmin: false
+    id: 'i1', filePath: 'cmd.exe', args: '', runAsAdmin: false
   });
+  assert.notStrictEqual(result.item.filePath, 'explorer.exe');
+  assert.ok(result.item.filePath.length > 0);
 });
 
 test('未声明或重复的启动项 ID 被拒绝', () => {

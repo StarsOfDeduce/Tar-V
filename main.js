@@ -642,6 +642,10 @@ handleTrustedIpc('launch-item', ['main'], async (event, itemId, forceRunAsAdmin 
   if (!selection.ok) return { success: false, error: selection.error };
 
   const { filePath, args, runAsAdmin } = selection.item;
+  // 执行层再次确认最终路径，避免字段映射或调用契约回归时把空路径交给系统外壳。
+  if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+    return { success: false, error: '启动路径解析失败' };
+  }
   
   try {
     // Handle Web URLs
@@ -712,11 +716,15 @@ handleTrustedIpc('launch-item', ['main'], async (event, itemId, forceRunAsAdmin 
 handleTrustedIpc('show-item-in-folder', ['main'], (event, itemId) => {
   const selection = selectConfiguredLaunch(loadConfig(), itemId, false);
   if (!selection.ok) return { success: false, error: selection.error };
-  if (/^https?:\/\//i.test(selection.item.path)) {
+  const { filePath } = selection.item;
+  if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+    return { success: false, error: '启动路径解析失败' };
+  }
+  if (/^https?:\/\//i.test(filePath)) {
     return { success: false, error: '网页启动项没有本地位置' };
   }
 
-  const cleanPath = resolveAbsolutePath(selection.item.path);
+  const cleanPath = resolveAbsolutePath(filePath);
   if (!path.isAbsolute(cleanPath) || !fs.existsSync(cleanPath)) {
     return { success: false, error: '无法找到启动项的本地位置' };
   }
