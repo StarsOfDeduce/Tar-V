@@ -858,7 +858,7 @@ async function renderItems(query = '') {
     const launchHandler = () => {
       const lang = config.settings.language || 'zh';
       const t = TRANSLATIONS[lang] || TRANSLATIONS.zh;
-      window.api.launchItem(item.path, item.args, item.runAsAdmin).then(res => {
+      window.api.launchItem(item.id).then(res => {
         if (res && !res.success) {
           showCustomAlert(t.alertLaunchFail + (res.error || ''));
         }
@@ -1533,15 +1533,15 @@ function setupEventListeners() {
       switch(action) {
         case 'open':
           const openItem = config.items.find(i => i.id === selectedItemId);
-          if (openItem) window.api.launchItem(openItem.path, openItem.args, openItem.runAsAdmin);
+          if (openItem) window.api.launchItem(openItem.id);
           break;
         case 'admin':
           const adminItem = config.items.find(i => i.id === selectedItemId);
-          if (adminItem) window.api.launchItem(adminItem.path, adminItem.args, true);
+          if (adminItem) window.api.launchItem(adminItem.id, true);
           break;
         case 'location':
           const locItem = config.items.find(i => i.id === selectedItemId);
-          if (locItem) window.api.launchItem('explorer.exe', `/select,"${locItem.path}"`, false);
+          if (locItem) window.api.showItemInFolder(locItem.id);
           break;
         case 'batch-mode-item-menu':
           isBatchMode = true;

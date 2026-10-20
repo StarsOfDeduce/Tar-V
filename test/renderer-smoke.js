@@ -3,7 +3,7 @@
 /**
  * 渲染层冒烟测试（需要在 Electron 中运行）：
  *
- *   node_modules/electron/dist/electron.exe test/renderer-smoke.js --disable-gpu --no-sandbox
+ *   npm run test:renderer
  *
  * 目的：验证在「沙箱开启 + 严格 CSP」之后，页面仍能正常加载、preload 桥接可用、
  * 本地字体生效、控制台没有 CSP 违规。
@@ -14,11 +14,15 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
+const { isTrustedIpcEvent, hardenRendererWindow } = require('../lib/security-boundary');
 
 const root = path.join(__dirname, '..');
 const resultPath = path.join(root, 'test', 'renderer-smoke-result.json');
 
 const pageErrors = [];
+let testWindow = null;
+let activeTrustedUrl = '';
 
 const stubConfig = {
   settings: {
@@ -43,7 +47,16 @@ const stubConfig = {
   },
   tabs: [{ id: 'tab-1', name: '常用' }],
   items: [
-    { id: 'i1', tabId: 'tab-1', name: '命令提示符', path: 'cmd.exe', args: '', icon: '', runAsAdmin: false }
+    { id: 'i1', tabId: 'tab-1', name: '命令提示符', path: 'cmd.exe', args: '', icon: '', runAsAdmin: false },
+    {
+      id: 'xss-item',
+      tabId: 'tab-1',
+      name: '<img id="tar-v-xss-marker" src=x onerror="window.__tarVXss=true">',
+      path: 'C:\\missing\\\"><img id="tar-v-path-xss-marker" src=x>',
+      args: '',
+      icon: '',
+      runAsAdmin: false
+    }
   ]
 };
 
@@ -54,11 +67,12 @@ const stubs = {
   'save-config': () => ({ success: true }),
   'get-file-icon': () => ICON_STUB,
   'launch-item': () => ({ success: true }),
+  'show-item-in-folder': () => ({ success: true }),
   'select-file': () => null,
   'select-folder': () => null,
   'update-autostart': () => ({ success: true }),
   'register-shortcut': () => ({ success: true }),
-  'check-paths': () => [true],
+  'check-paths': (event, paths) => paths.map(() => false),
   'hide-window': () => ({ success: true }),
   'close-app': () => ({ success: true }),
   'center-window': () => ({ success: true }),
@@ -71,7 +85,15 @@ const stubs = {
 };
 
 for (const [channel, handler] of Object.entries(stubs)) {
-  ipcMain.handle(channel, handler);
+  ipcMain.handle(channel, (event, ...args) => {
+    const allowed = testWindow
+      ? [{ webContents: testWindow.webContents, url: activeTrustedUrl }]
+      : [];
+    if (!isTrustedIpcEvent(event, allowed)) {
+      throw new Error(`IPC source rejected during smoke test: ${channel}`);
+    }
+    return handler(event, ...args);
+  });
 }
 
 function finish(payload) {
@@ -80,7 +102,8 @@ function finish(payload) {
   } catch (err) {
     console.error('写入结果失败', err);
   }
-  app.exit(0);
+  console.log(JSON.stringify(payload));
+  app.exit(payload.ok ? 0 : 1);
 }
 
 app.whenReady().then(async () => {
@@ -95,6 +118,7 @@ app.whenReady().then(async () => {
       sandbox: true
     }
   });
+  testWindow = win;
 
   let messages = [];
 
@@ -120,11 +144,25 @@ app.whenReady().then(async () => {
   for (const page of pages) {
     messages = [];
     try {
-      await win.loadFile(path.join(root, page.file));
+      const pagePath = path.join(root, page.file);
+      activeTrustedUrl = pathToFileURL(pagePath).href;
+      hardenRendererWindow(win, activeTrustedUrl);
+      await win.loadFile(pagePath);
       await new Promise((r) => setTimeout(r, 1200));
 
       const checks = await win.webContents.executeJavaScript(`(async () => {
         await document.fonts.ready;
+        let deadPathEscaped = true;
+        if (${JSON.stringify(page.label)} === 'settings') {
+          document.getElementById('btn-scan-paths').click();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          const pathName = document.querySelector('.path-item-row .path-name');
+          deadPathEscaped = !!pathName &&
+            pathName.textContent.includes('<img id="tar-v-xss-marker"') &&
+            !document.getElementById('tar-v-xss-marker') &&
+            !document.getElementById('tar-v-path-xss-marker') &&
+            window.__tarVXss !== true;
+        }
         return {
           hasApi: typeof window.api === 'object' && window.api !== null,
           hasRequire: typeof window.require !== 'undefined',
@@ -132,9 +170,15 @@ app.whenReady().then(async () => {
           hasModule: typeof window.module !== 'undefined',
           cspMeta: !!document.querySelector('meta[http-equiv="Content-Security-Policy"]'),
           interLoaded: document.fonts.check('16px Inter'),
-          title: document.title
+          title: document.title,
+          deadPathEscaped,
+          popupBlocked: window.open('https://example.com/') === null
         };
       })()`);
+
+      await win.webContents.executeJavaScript("window.location.href = 'https://example.com/'; true");
+      await new Promise((r) => setTimeout(r, 100));
+      checks.navigationBlocked = win.webContents.getURL() === activeTrustedUrl;
 
       const snapshot = messages.slice();
       const cspViolations = snapshot.filter((m) =>
@@ -161,7 +205,8 @@ app.whenReady().then(async () => {
 
   const allGood = pageResults.length === pages.length && pageResults.every((r) =>
     r.checks && r.checks.hasApi && !r.checks.hasRequire && !r.checks.hasProcess &&
-    !r.checks.hasModule && r.checks.cspMeta && r.checks.interLoaded &&
+    !r.checks.hasModule && r.checks.cspMeta && r.checks.interLoaded && r.checks.deadPathEscaped &&
+    r.checks.popupBlocked && r.checks.navigationBlocked &&
     r.cspViolations.length === 0 && r.errorMessages.length === 0
   );
 

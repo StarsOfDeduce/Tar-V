@@ -174,10 +174,32 @@ function waitForFile(filePath, timeoutMs = 5000) {
     assert.strictEqual(fs.existsSync(pwned), false, '参数中的命令被 cmd 解释了');
   });
 
+  await test('.bat 拒绝 %VAR% 环境变量展开注入', async () => {
+    const pwned = path.join(batDir, 'pwned-percent.txt');
+    const envName = 'TAR_V_INJECTION_TEST';
+    process.env[envName] = `safe" & echo PWNED> "${pwned}" & rem "`;
+    try {
+      await assert.rejects(
+        () => launchBatchFile(batPath, [`%${envName}%`]),
+        /%/
+      );
+      assert.strictEqual(fs.existsSync(pwned), false, '环境变量载荷被执行了');
+    } finally {
+      delete process.env[envName];
+    }
+  });
+
+  await test('.bat 拒绝 !VAR! 延迟展开载荷', async () => {
+    await assert.rejects(
+      () => launchBatchFile(batPath, ['!TAR_V_INJECTION_TEST!']),
+      /!/
+    );
+  });
+
   await test('ProcessStartInfo 通道（提权路径）同样不执行注入', async () => {
     const pwned = path.join(batDir, 'pwned3.txt');
     const commandLine = buildCmdCommandLine(batPath, [`& echo PWNED> "${pwned}"`]);
-    await startProcessRaw(comspec, `/d /s /c ${commandLine}`, { elevate: false });
+    await startProcessRaw(comspec, `/d /v:off /s /c ${commandLine}`, { elevate: false });
     await sleep(1200);
     assert.strictEqual(fs.existsSync(pwned), false, '提权通道转义失效');
   });

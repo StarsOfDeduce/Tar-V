@@ -2,6 +2,7 @@ const { app, BrowserWindow, globalShortcut, ipcMain, dialog, shell, screen, Tray
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 
 const { parseWindowsArgs } = require('./lib/args');
 const {
@@ -12,6 +13,8 @@ const {
 const { launchBatchFile } = require('./lib/launch');
 const { createDirAuthorizer, hasTraversal } = require('./lib/path-guard');
 const { validateConfig } = require('./lib/config-schema');
+const { selectConfiguredLaunch } = require('./lib/launch-policy');
+const { isTrustedIpcEvent, hardenRendererWindow } = require('./lib/security-boundary');
 
 let win = null;
 let settingsWin = null; // Independent Settings Window
@@ -20,6 +23,29 @@ let currentConfig = null;
 
 // 待确认的导入配置：校验通过后先暂存，等用户在界面上二次确认再应用
 let pendingImport = null;
+
+const TRUSTED_RENDERER_URLS = Object.freeze({
+  main: pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href,
+  settings: pathToFileURL(path.join(__dirname, 'renderer', 'settings.html')).href
+});
+
+function getTrustedRenderers(roles) {
+  return roles.flatMap((role) => {
+    const browserWindow = role === 'main' ? win : settingsWin;
+    if (!browserWindow || browserWindow.isDestroyed()) return [];
+    return [{ webContents: browserWindow.webContents, url: TRUSTED_RENDERER_URLS[role] }];
+  });
+}
+
+function handleTrustedIpc(channel, roles, handler) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedIpcEvent(event, getTrustedRenderers(roles))) {
+      console.warn(`Blocked untrusted IPC invocation: ${channel}`);
+      throw new Error('不受信任的页面无权执行此操作');
+    }
+    return handler(event, ...args);
+  });
+}
 
 // 会话级目录授权表：只有用户通过系统对话框亲自选择的目录才允许被枚举
 const dirAuthorizer = createDirAuthorizer([app.getPath('userData')]);
@@ -188,6 +214,7 @@ function createWindow() {
     }
   });
 
+  hardenRendererWindow(win, TRUSTED_RENDERER_URLS.main);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   win.on('resize', () => {
@@ -399,32 +426,46 @@ function resolveAbsolutePath(filePath) {
 // --- IPC IPC IPC ---
 
 // Get config
-ipcMain.handle('get-config', () => {
+handleTrustedIpc('get-config', ['main', 'settings'], () => {
   return loadConfig();
 });
 
 // Save config
-ipcMain.handle('save-config', (event, newConfig) => {
+handleTrustedIpc('save-config', ['main', 'settings'], (event, newConfig) => {
   const current = loadConfig();
+  const candidate = (
+    newConfig && typeof newConfig === 'object' && !Array.isArray(newConfig)
+  ) ? {
+      ...newConfig,
+      settings: (
+        newConfig.settings && typeof newConfig.settings === 'object' && !Array.isArray(newConfig.settings)
+      ) ? { ...newConfig.settings } : newConfig.settings
+    } : newConfig;
+
   // Preserve window sizing configuration (Req 36)
-  if (!newConfig.settings) newConfig.settings = {};
-  if (current.settings && current.settings.windowSize) {
-    newConfig.settings.windowSize = current.settings.windowSize;
+  if (candidate && candidate.settings && current.settings && current.settings.windowSize) {
+    candidate.settings.windowSize = current.settings.windowSize;
   }
-  if (current.settings && current.settings.settingsWindowSize) {
-    newConfig.settings.settingsWindowSize = current.settings.settingsWindowSize;
+  if (candidate && candidate.settings && current.settings && current.settings.settingsWindowSize) {
+    candidate.settings.settingsWindowSize = current.settings.settingsWindowSize;
   }
-  
-  saveConfigSync(newConfig);
+
+  const validation = validateConfig(candidate);
+  if (!validation.ok) {
+    return { success: false, error: validation.errors.slice(0, 8).join('；') };
+  }
+
+  const cleanConfig = validation.value;
+  saveConfigSync(cleanConfig);
   // Notify the main window to update its view instantly
   if (win && !win.isDestroyed()) {
-    win.webContents.send('config-updated', newConfig);
+    win.webContents.send('config-updated', cleanConfig);
   }
-  return { success: true };
+  return { success: true, warnings: validation.warnings };
 });
 
 // Open separate independent settings window
-ipcMain.handle('open-settings-window', () => {
+handleTrustedIpc('open-settings-window', ['main'], () => {
   if (settingsWin) {
     if (settingsWin.isMinimized()) settingsWin.restore();
     settingsWin.focus();
@@ -451,6 +492,7 @@ ipcMain.handle('open-settings-window', () => {
     }
   });
   
+  hardenRendererWindow(settingsWin, TRUSTED_RENDERER_URLS.settings);
   settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   
   // Keep settings window centered on resize (Req 27) and remember size (Req 30)
@@ -528,7 +570,7 @@ function extractIconWithPowerShell(targetPath) {
 }
 
 // Get high-res icon for a path
-ipcMain.handle('get-file-icon', async (event, filePath, forceRefresh = false) => {
+handleTrustedIpc('get-file-icon', ['main', 'settings'], async (event, filePath, forceRefresh = false) => {
   if (!filePath) return FALLBACK_ICONS.file;
   
   // Handle URLs
@@ -594,11 +636,12 @@ function isSystemCommandRef(cleanPath) {
 }
 
 // Launch item
-ipcMain.handle('launch-item', async (event, filePath, args, runAsAdmin) => {
-  if (!filePath || typeof filePath !== 'string') {
-    return { success: false, error: '启动路径为空' };
-  }
+handleTrustedIpc('launch-item', ['main'], async (event, itemId, forceRunAsAdmin = false) => {
   const config = loadConfig();
+  const selection = selectConfiguredLaunch(config, itemId, forceRunAsAdmin);
+  if (!selection.ok) return { success: false, error: selection.error };
+
+  const { filePath, args, runAsAdmin } = selection.item;
   
   try {
     // Handle Web URLs
@@ -665,8 +708,25 @@ ipcMain.handle('launch-item', async (event, filePath, args, runAsAdmin) => {
   }
 });
 
+// Open the containing folder for a configured item without accepting a renderer-supplied path.
+handleTrustedIpc('show-item-in-folder', ['main'], (event, itemId) => {
+  const selection = selectConfiguredLaunch(loadConfig(), itemId, false);
+  if (!selection.ok) return { success: false, error: selection.error };
+  if (/^https?:\/\//i.test(selection.item.path)) {
+    return { success: false, error: '网页启动项没有本地位置' };
+  }
+
+  const cleanPath = resolveAbsolutePath(selection.item.path);
+  if (!path.isAbsolute(cleanPath) || !fs.existsSync(cleanPath)) {
+    return { success: false, error: '无法找到启动项的本地位置' };
+  }
+
+  shell.showItemInFolder(cleanPath);
+  return { success: true };
+});
+
 // File chooser
-ipcMain.handle('select-file', async (event) => {
+handleTrustedIpc('select-file', ['main'], async (event) => {
   const senderWindow = BrowserWindow.fromWebContents(event.sender) || win;
   const result = await dialog.showOpenDialog(senderWindow, {
     properties: ['openFile'],
@@ -681,7 +741,7 @@ ipcMain.handle('select-file', async (event) => {
 });
 
 // Folder chooser
-ipcMain.handle('select-folder', async (event) => {
+handleTrustedIpc('select-folder', ['main'], async (event) => {
   const senderWindow = BrowserWindow.fromWebContents(event.sender) || win;
   const result = await dialog.showOpenDialog(senderWindow, {
     properties: ['openDirectory'],
@@ -696,7 +756,7 @@ ipcMain.handle('select-folder', async (event) => {
 });
 
 // Auto-start setting
-ipcMain.handle('update-autostart', (event, enabled) => {
+handleTrustedIpc('update-autostart', ['settings'], (event, enabled) => {
   app.setLoginItemSettings({
     openAtLogin: enabled,
     path: app.getPath('exe'),
@@ -709,7 +769,7 @@ ipcMain.handle('update-autostart', (event, enabled) => {
 });
 
 // Change Global Hotkey
-ipcMain.handle('register-shortcut', (event, accelerator) => {
+handleTrustedIpc('register-shortcut', ['settings'], (event, accelerator) => {
   registerGlobalShortcut(accelerator);
   const config = loadConfig();
   config.settings.hotkey = accelerator;
@@ -718,7 +778,7 @@ ipcMain.handle('register-shortcut', (event, accelerator) => {
 });
 
 // Check file paths existence
-ipcMain.handle('check-paths', (event, paths) => {
+handleTrustedIpc('check-paths', ['settings'], (event, paths) => {
   if (!Array.isArray(paths)) return [];
 
   // 只回答"当前配置里确实存在的启动项路径"，避免该接口被当作任意文件系统探测器
@@ -746,23 +806,23 @@ ipcMain.handle('check-paths', (event, paths) => {
   });
 });
 
-ipcMain.handle('hide-window', () => {
+handleTrustedIpc('hide-window', ['main'], () => {
   hideWindow();
   return { success: true };
 });
 
-ipcMain.handle('close-app', () => {
+handleTrustedIpc('close-app', ['main'], () => {
   app.isQuiting = true;
   app.quit();
 });
 
-ipcMain.handle('center-window', () => {
+handleTrustedIpc('center-window', ['main'], () => {
   showWindowCentered();
   return { success: true };
 });
 
 // Export Config
-ipcMain.handle('export-config', async (event) => {
+handleTrustedIpc('export-config', ['settings'], async (event) => {
   const senderWindow = BrowserWindow.fromWebContents(event.sender) || win;
   const result = await dialog.showSaveDialog(senderWindow, {
     title: '导出配置文件',
@@ -782,7 +842,7 @@ ipcMain.handle('export-config', async (event) => {
 });
 
 // Import Config — 第一步：读取 + 校验，暂存待确认
-ipcMain.handle('import-config', async (event) => {
+handleTrustedIpc('import-config', ['settings'], async (event) => {
   const senderWindow = BrowserWindow.fromWebContents(event.sender) || win;
   const result = await dialog.showOpenDialog(senderWindow, {
     title: '导入配置文件',
@@ -822,7 +882,7 @@ ipcMain.handle('import-config', async (event) => {
 });
 
 // Import Config — 第二步：用户确认后才真正应用
-ipcMain.handle('confirm-import-config', async (event, accept) => {
+handleTrustedIpc('confirm-import-config', ['settings'], async (event, accept) => {
   if (!pendingImport) {
     return { success: false, error: '没有待确认的导入配置' };
   }
@@ -855,7 +915,7 @@ ipcMain.handle('confirm-import-config', async (event, accept) => {
 });
 
 // Get all files inside a folder (non-recursive) for batch importing
-ipcMain.handle('get-folder-files', async (event, folderPath) => {
+handleTrustedIpc('get-folder-files', ['main'], async (event, folderPath) => {
   try {
     if (typeof folderPath !== 'string' || folderPath.length === 0) {
       return { success: false, error: '路径无效' };
@@ -899,7 +959,7 @@ ipcMain.handle('get-folder-files', async (event, folderPath) => {
 });
 
 // Resolve windows .lnk and .url shortcuts target
-ipcMain.handle('resolve-shortcut', (event, filePath) => {
+handleTrustedIpc('resolve-shortcut', ['main'], (event, filePath) => {
   const fallback = { target: filePath || '', args: '', cwd: '', iconPath: '' };
 
   if (typeof filePath !== 'string' || filePath.length === 0) {

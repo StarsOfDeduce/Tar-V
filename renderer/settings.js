@@ -44,6 +44,7 @@ const TRANSLATIONS = {
     btnSave: "保存修改",
     btnCancel: "取消",
     btnConfirm: "确定",
+    msg_save_fail: "保存配置失败: ",
 
     opt_lang_title: "语言",
     opt_lang_desc: "选择界面的显示语言",
@@ -187,6 +188,7 @@ const TRANSLATIONS = {
     btnSave: "Save Changes",
     btnCancel: "Cancel",
     btnConfirm: "Confirm",
+    msg_save_fail: "Failed to save settings: ",
 
     opt_lang_title: "Language",
     opt_lang_desc: "Select the display language for the user interface",
@@ -1125,7 +1127,13 @@ function setupEventListeners() {
 
   // Footer Save
   btnSettingsSave.addEventListener('click', async () => {
-    await window.api.saveConfig(config);
+    const saved = await window.api.saveConfig(config);
+    if (!saved || !saved.success) {
+      const lang = config.settings.language || 'zh';
+      const t = TRANSLATIONS[lang] || TRANSLATIONS.zh;
+      await showCustomAlert(t.msg_save_fail + (saved && saved.error ? saved.error : ''));
+      return;
+    }
     // Apply changes on systems side
     await window.api.updateAutostart(config.settings.autostart);
     await window.api.registerShortcut(config.settings.hotkey);
@@ -1223,10 +1231,17 @@ function setupEventListeners() {
         deadItemsList.push(item);
         const r = document.createElement('div');
         r.className = 'path-item-row';
-        r.innerHTML = `
-          <span class="path-name" title="${item.path}">${item.name}</span>
-          <span class="path-status">${t.status_dead}</span>
-        `;
+
+        const name = document.createElement('span');
+        name.className = 'path-name';
+        name.title = item.path;
+        name.textContent = item.name;
+
+        const status = document.createElement('span');
+        status.className = 'path-status';
+        status.textContent = t.status_dead;
+
+        r.append(name, status);
         pathCheckResults.appendChild(r);
       }
     });

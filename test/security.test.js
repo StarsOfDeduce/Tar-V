@@ -10,6 +10,8 @@ const { parseWindowsArgs, quoteForCreateProcess, quoteForCmdArg, buildCmdCommand
 const { psQuote, encodeCommand, buildProcessStartScript, buildIconExtractScript } = require('../lib/powershell');
 const { isInside, hasTraversal, createDirAuthorizer } = require('../lib/path-guard');
 const { validateConfig } = require('../lib/config-schema');
+const { selectConfiguredLaunch } = require('../lib/launch-policy');
+const { isTrustedIpcEvent, hardenRendererWindow } = require('../lib/security-boundary');
 
 let passed = 0;
 const failures = [];
@@ -104,6 +106,12 @@ test('quoteForCmdArg 整体加引号并转义元字符', () => {
   assert.strictEqual(quoteForCmdArg('a&b'), '"a^&b"');
   assert.strictEqual(quoteForCmdArg('a"b'), '"a^"b"');
   assert.strictEqual(quoteForCmdArg('a^b'), '"a^^b"');
+});
+
+test('quoteForCmdArg 拒绝 cmd 环境变量与延迟展开符', () => {
+  assert.throws(() => quoteForCmdArg('%PATH%'), /%/);
+  assert.throws(() => quoteForCmdArg('!payload!'), /!/);
+  assert.throws(() => buildCmdCommandLine('C:\\%TEMP%\\x.bat', []), /%/);
 });
 
 test('buildCmdCommandLine 外层再包一层引号', () => {
@@ -253,13 +261,12 @@ test('columns 越界被拒绝', () => {
   assert.strictEqual(result.ok, false);
 });
 
-test('未知 settings 键被丢弃并告警', () => {
+test('未知 settings 键被拒绝', () => {
   const cfg = baseConfig();
   cfg.settings.mystery = 1;
   const result = validateConfig(cfg);
-  assert.strictEqual(result.ok, true);
-  assert.strictEqual(result.value.settings.mystery, undefined);
-  assert.ok(result.warnings.length > 0);
+  assert.strictEqual(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('mystery')));
 });
 
 test('自启动与管理员项进入摘要', () => {
@@ -277,6 +284,80 @@ test('runAsAdmin 强制布尔化', () => {
   cfg.items[0].runAsAdmin = 'true';
   const result = validateConfig(cfg);
   assert.strictEqual(result.ok, false);
+});
+
+test('重复的 tab 和 item ID 被拒绝', () => {
+  const duplicateTab = baseConfig();
+  duplicateTab.tabs.push({ id: 'tab-1', name: '重复' });
+  assert.strictEqual(validateConfig(duplicateTab).ok, false);
+
+  const duplicateItem = baseConfig();
+  duplicateItem.items.push({ ...duplicateItem.items[0] });
+  assert.strictEqual(validateConfig(duplicateItem).ok, false);
+});
+
+// ---------------------------------------------------------------- launch-policy
+console.log('\n[lib/launch-policy]');
+
+test('启动时只从当前配置按 ID 取路径与参数', () => {
+  const cfg = baseConfig();
+  const result = selectConfiguredLaunch(cfg, 'i1');
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(result.item, {
+    id: 'i1', path: 'cmd.exe', args: '', runAsAdmin: false
+  });
+});
+
+test('未声明或重复的启动项 ID 被拒绝', () => {
+  const cfg = baseConfig();
+  assert.strictEqual(selectConfiguredLaunch(cfg, 'missing').ok, false);
+  cfg.items.push({ ...cfg.items[0] });
+  assert.strictEqual(selectConfiguredLaunch(cfg, 'i1').ok, false);
+});
+
+test('只允许布尔类型的一次性管理员启动', () => {
+  const cfg = baseConfig();
+  assert.strictEqual(selectConfiguredLaunch(cfg, 'i1', 'true').ok, false);
+  assert.strictEqual(selectConfiguredLaunch(cfg, 'i1', true).item.runAsAdmin, true);
+});
+
+// ---------------------------------------------------------------- security-boundary
+console.log('\n[lib/security-boundary]');
+
+test('IPC 只信任指定窗口的本地顶层主帧', () => {
+  const url = 'file:///D:/Tar%20V/renderer/index.html';
+  const frame = { url };
+  const sender = { mainFrame: frame, getURL: () => url };
+  const allowed = [{ webContents: sender, url }];
+
+  assert.strictEqual(isTrustedIpcEvent({ sender, senderFrame: frame }, allowed), true);
+  assert.strictEqual(isTrustedIpcEvent({
+    sender: { mainFrame: frame, getURL: () => 'https://evil.example/' },
+    senderFrame: frame
+  }, allowed), false);
+  assert.strictEqual(isTrustedIpcEvent({ sender, senderFrame: { url } }, allowed), false);
+});
+
+test('窗口硬化拒绝弹窗和外部导航', () => {
+  const handlers = {};
+  let openHandler = null;
+  const browserWindow = {
+    webContents: {
+      setWindowOpenHandler: (handler) => { openHandler = handler; },
+      on: (name, handler) => { handlers[name] = handler; }
+    }
+  };
+  const trustedUrl = 'file:///D:/Tar%20V/renderer/index.html';
+  hardenRendererWindow(browserWindow, trustedUrl);
+
+  assert.deepStrictEqual(openHandler(), { action: 'deny' });
+  let blocked = false;
+  handlers['will-navigate']({ preventDefault: () => { blocked = true; } }, 'https://evil.example/');
+  assert.strictEqual(blocked, true);
+
+  blocked = false;
+  handlers['will-navigate']({ preventDefault: () => { blocked = true; } }, trustedUrl);
+  assert.strictEqual(blocked, false);
 });
 
 // ---------------------------------------------------------------- 汇总
