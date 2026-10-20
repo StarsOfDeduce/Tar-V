@@ -7,7 +7,8 @@
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "test": "node test/security.test.js"
+    "test": "node test/security.test.js && node test/launch.test.js",
+    "test:renderer": "electron test/renderer-smoke.js --disable-gpu"
   },
   "build": {
     "appId": "com.starsofdeduce.tarv",
@@ -41,6 +42,11 @@
   "type": "commonjs",
   "devDependencies": {
     "electron": "^42.11.15",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.17.0"
+  },
+  "overrides": {
+    "app-builder-lib": {
+      "@electron/get": "5.1.0"
+    }
   }
 }
