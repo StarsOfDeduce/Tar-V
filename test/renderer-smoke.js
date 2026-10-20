@@ -19,6 +19,11 @@ const { isTrustedIpcEvent, hardenRendererWindow } = require('../lib/security-bou
 
 const root = path.join(__dirname, '..');
 const resultPath = path.join(root, 'test', 'renderer-smoke-result.json');
+const profilePath = path.join(root, 'test', 'renderer-smoke-profile');
+
+fs.mkdirSync(profilePath, { recursive: true });
+app.setPath('userData', profilePath);
+app.setPath('cache', path.join(profilePath, 'cache'));
 
 const pageErrors = [];
 let testWindow = null;

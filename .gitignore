@@ -25,3 +25,4 @@ pnpm-debug.log*
 
 # Test artifacts
 test/renderer-smoke-result.json
+test/renderer-smoke-profile/

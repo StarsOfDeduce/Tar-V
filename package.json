@@ -1,12 +1,13 @@
 {
   "name": "tar-v",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
+    "audit:release": "node scripts/audit-release.js",
     "test": "node test/security.test.js && node test/launch.test.js",
     "test:renderer": "electron test/renderer-smoke.js --disable-gpu"
   },
