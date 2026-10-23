@@ -3,6 +3,7 @@ node_modules/
 
 # Build outputs
 dist/
+dist-*/
 
 # Operating system files
 .DS_Store

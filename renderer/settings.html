@@ -7,74 +7,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tar V - 设置</title>
   <link rel="stylesheet" href="index.css">
-  <style>
-    body {
-      background: var(--bg-app);
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .settings-window-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      background: var(--bg-app);
-      position: relative;
-    }
-    .settings-sidebar {
-      height: 100%;
-      width: 180px;
-      flex-shrink: 0;
-    }
-    .settings-content {
-      flex: 1;
-      height: 100%;
-      padding: 24px 32px 80px 32px; /* Bottom padding for fixed footer */
-      overflow-y: auto;
-    }
-    .settings-footer {
-      position: fixed;
-      bottom: 0;
-      right: 0;
-      left: 180px;
-      background: var(--bg-app);
-      padding: 16px 32px;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-      z-index: 100;
-    }
-    /* Seamless dialog overlay overrides for settings page */
-    .modal-header {
-      background: transparent !important;
-      border-bottom: none !important;
-    }
-    .modal-footer {
-      background: transparent !important;
-      border-top: none !important;
-      justify-content: center !important;
-      gap: 16px !important;
-      padding-bottom: 24px !important;
-    }
-    #dialog-modal .btn-primary, #dialog-modal .btn-secondary,
-    #prompt-modal .btn-primary, #prompt-modal .btn-secondary {
-      padding: 10px 24px !important;
-      font-size: 13px !important;
-      min-width: 100px !important;
-    }
-  </style>
+  <link rel="stylesheet" href="settings.css">
 </head>
-<body>
+<body class="settings-page">
   <div class="settings-window-container">
-    <!-- Settings Sidebar -->
-    <aside class="settings-sidebar no-drag">
+    <!-- Aplomb-inspired title bar and horizontal navigation -->
+    <header class="settings-chrome">
       <div class="sidebar-header">
-        <h3>设置中心</h3>
+        <div class="sidebar-brand-copy">
+          <h3>Tar V</h3>
+          <span id="studio-subtitle">设置中心</span>
+        </div>
+        <button id="btn-window-close" class="studio-window-close no-drag" type="button" aria-label="关闭设置窗口">×</button>
       </div>
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav no-drag" aria-label="设置分类">
         <div class="sidebar-item active" data-tab="settings-general">
           <span>常规</span>
         </div>
@@ -101,9 +47,9 @@
         </div>
       </nav>
       <div class="sidebar-footer">
-        <span>Tar V v1.0.6</span>
+        <span>Tar V v2.0.0</span>
       </div>
-    </aside>
+    </header>
 
     <!-- Settings Content -->
     <main class="settings-content no-drag">
@@ -112,7 +58,8 @@
       <section id="settings-general" class="settings-section active">
         <h2>常规设置</h2>
         <hr class="settings-divider">
-        
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">语言</div>
@@ -151,143 +98,174 @@
             </label>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 2: Appearance (外观) -->
       <section id="settings-appearance" class="settings-section">
         <h2>外观设置</h2>
         <hr class="settings-divider">
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">界面风格</div>
-            <div class="setting-desc">切换主面板的主题风格模式</div>
-          </div>
-          <div class="setting-action">
-            <select id="opt-style-mode" class="dropdown-style">
-              <option value="dark">深色模式</option>
-              <option value="light">浅色模式</option>
-              <option value="system">跟随系统</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">网格列数</div>
-            <div class="setting-desc">主面板中每行显示的快捷图标列数 (6 - 12)</div>
-          </div>
-          <div class="setting-action">
-            <select id="opt-columns" class="dropdown-style">
-              <option value="6">6 列</option>
-              <option value="7">7 列</option>
-              <option value="8">8 列</option>
-              <option value="9">9 列</option>
-              <option value="10">10 列</option>
-              <option value="12">12 列</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">背景基色</div>
-            <div class="setting-desc">选择或输入面板的基础背景色</div>
-          </div>
-          <div class="setting-action" style="display:flex; align-items:center; gap:8px;">
-            <input type="color" id="opt-bg-color-picker" style="width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; outline:none;">
-            <input type="text" id="opt-bg-color" class="dropdown-style" style="width:78px; text-align:center; padding:4px 6px;" value="#1e1e1e">
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">高亮主题色</div>
-            <div class="setting-desc">修改按钮、激活标签和边框的高亮颜色</div>
-          </div>
-          <div class="setting-action" style="display:flex; align-items:center; gap:8px;">
-            <input type="color" id="opt-accent-color-picker" style="width:24px; height:24px; border:none; padding:0; background:none; cursor:pointer; outline:none;">
-            <input type="text" id="opt-accent-color" class="dropdown-style" style="width:78px; text-align:center; padding:4px 6px;" value="#e04f35">
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">面板背景不透明度</div>
-            <div class="setting-desc">调整主窗口背景透明度 (30% - 100%, 仅对毛玻璃及液态玻璃风格有效)</div>
-          </div>
-          <div class="setting-action">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="range" id="opt-opacity" min="30" max="100" value="85" style="width:80px; accent-color:var(--accent);">
-              <span id="opt-opacity-val" style="font-size:11px; width:28px;">85%</span>
+        <div class="settings-card-grid">
+          <div class="settings-card">
+            <div class="settings-card-heading">
+              <span aria-hidden="true">◉</span>
+              <strong id="appearance-theme-card-title">主题与色彩</strong>
+              <small id="appearance-theme-card-status">即时生效</small>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">界面风格</div>
+                <div class="setting-desc">切换主面板的主题风格模式</div>
+              </div>
+              <div class="setting-action">
+                <select id="opt-style-mode" class="dropdown-style">
+                  <option value="dark">深色模式</option>
+                  <option value="light">浅色模式</option>
+                  <option value="system">跟随系统</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">设置中心跟随界面风格</div>
+                <div class="setting-desc">开启后，设置中心会随深色、浅色或系统模式自动切换配色</div>
+              </div>
+              <div class="setting-action">
+                <label class="switch">
+                  <input type="checkbox" id="opt-settings-follow-theme">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">高亮主题色</div>
+                <div class="setting-desc">修改按钮、激活标签和边框的高亮颜色</div>
+              </div>
+              <div class="setting-action color-action">
+                <input type="color" id="opt-accent-color-picker" aria-label="选择高亮主题色">
+                <input type="text" id="opt-accent-color" class="dropdown-style color-value" value="#e04f35">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">设置中心背景色</div>
+                <div class="setting-desc">单独修改设置窗口的基础背景色</div>
+              </div>
+              <div class="setting-action color-action">
+                <input type="color" id="opt-settings-bg-color-picker" aria-label="选择设置中心背景色">
+                <input type="text" id="opt-settings-bg-color" class="dropdown-style color-value" value="#151517">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">设置中心强调色</div>
+                <div class="setting-desc">修改设置窗口的标签、开关和按钮颜色</div>
+              </div>
+              <div class="setting-action color-action">
+                <input type="color" id="opt-settings-accent-color-picker" aria-label="选择设置中心强调色">
+                <input type="text" id="opt-settings-accent-color" class="dropdown-style color-value" value="#61269c">
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">面板背景不透明度</div>
+                <div class="setting-desc">调整主窗口背景透明度 (30% - 100%)</div>
+              </div>
+              <div class="setting-action range-action">
+                <input type="range" id="opt-opacity" min="30" max="100" value="85">
+                <span id="opt-opacity-val">85%</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">圆角大小</div>
-            <div class="setting-desc">调整主窗口四角的圆角程度</div>
-          </div>
-          <div class="setting-action">
-            <select id="opt-radius" class="dropdown-style">
-              <option value="0px">直角 (0px)</option>
-              <option value="4px">小圆角 (4px)</option>
-              <option value="8px">中圆角 (8px)</option>
-              <option value="12px">大圆角 (12px)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">隐藏项目名称</div>
-            <div class="setting-desc">仅显示图标，隐藏快捷方式名称</div>
-          </div>
-          <div class="setting-action">
-            <label class="switch">
-              <input type="checkbox" id="opt-hide-names">
-              <span class="slider round"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Custom Sizers (Req 23) -->
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">标签页字体大小</div>
-            <div class="setting-desc">控制主界面分组标签文本字号 (10px - 24px)</div>
-          </div>
-          <div class="setting-action">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="range" id="opt-font-size-tab" min="10" max="24" value="14" style="width:80px; accent-color:var(--accent);">
-              <span id="opt-font-size-tab-val" style="font-size:11px; width:28px;">14px</span>
+          <div class="settings-card">
+            <div class="settings-card-heading">
+              <span aria-hidden="true">▦</span>
+              <strong id="appearance-layout-card-title">布局密度</strong>
+              <small id="appearance-layout-card-status">8 列</small>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">网格列数</div>
+                <div class="setting-desc">主面板中每行显示的快捷图标列数 (6 - 12)</div>
+              </div>
+              <div class="setting-action">
+                <select id="opt-columns" class="dropdown-style">
+                  <option value="6">6 列</option>
+                  <option value="7">7 列</option>
+                  <option value="8">8 列</option>
+                  <option value="9">9 列</option>
+                  <option value="10">10 列</option>
+                  <option value="12">12 列</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">圆角大小</div>
+                <div class="setting-desc">调整主窗口四角的圆角程度</div>
+              </div>
+              <div class="setting-action">
+                <select id="opt-radius" class="dropdown-style">
+                  <option value="0px">直角 (0px)</option>
+                  <option value="4px">小圆角 (4px)</option>
+                  <option value="8px">中圆角 (8px)</option>
+                  <option value="12px">大圆角 (12px)</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">隐藏项目名称</div>
+                <div class="setting-desc">仅显示图标，隐藏快捷方式名称</div>
+              </div>
+              <div class="setting-action">
+                <label class="switch">
+                  <input type="checkbox" id="opt-hide-names">
+                  <span class="slider round"></span>
+                </label>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">快捷项字体大小</div>
-            <div class="setting-desc">控制主界面快捷项名称文本字号 (10px - 24px)</div>
-          </div>
-          <div class="setting-action">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="range" id="opt-font-size-item" min="10" max="24" value="13" style="width:80px; accent-color:var(--accent);">
-              <span id="opt-font-size-item-val" style="font-size:11px; width:28px;">13px</span>
+          <div class="settings-card settings-card-wide">
+            <div class="settings-card-heading">
+              <span aria-hidden="true">Aa</span>
+              <strong id="appearance-type-card-title">文字尺寸</strong>
             </div>
-          </div>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-title">设置中心字体大小</div>
-            <div class="setting-desc">控制本设置页面内所有文本字号 (10px - 24px)</div>
-          </div>
-          <div class="setting-action">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <input type="range" id="opt-font-size-settings" min="10" max="24" value="14" style="width:80px; accent-color:var(--accent);">
-              <span id="opt-font-size-settings-val" style="font-size:11px; width:28px;">14px</span>
+            <div class="type-scale-grid">
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-title">标签页字体大小</div>
+                  <div class="setting-desc">控制主界面分组标签文本字号 (10px - 24px)</div>
+                </div>
+                <div class="setting-action range-action">
+                  <input type="range" id="opt-font-size-tab" min="10" max="24" value="14">
+                  <span id="opt-font-size-tab-val">14px</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-title">快捷项字体大小</div>
+                  <div class="setting-desc">控制主界面快捷项名称文本字号 (10px - 24px)</div>
+                </div>
+                <div class="setting-action range-action">
+                  <input type="range" id="opt-font-size-item" min="10" max="24" value="13">
+                  <span id="opt-font-size-item-val">13px</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-title">设置中心字体大小</div>
+                  <div class="setting-desc">控制本设置页面内所有文本字号 (10px - 24px)</div>
+                </div>
+                <div class="setting-action range-action">
+                  <input type="range" id="opt-font-size-settings" min="10" max="24" value="14">
+                  <span id="opt-font-size-settings-val">14px</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -297,7 +275,8 @@
       <section id="settings-preferences" class="settings-section">
         <h2>偏好设置</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">项目启动点击模式</div>
@@ -349,13 +328,16 @@
             </label>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 4: Show/Hide (唤出与收起) -->
       <section id="settings-hotkeys" class="settings-section">
         <h2>唤出与收起</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">键盘快捷键唤出面板</div>
@@ -394,13 +376,16 @@
             </select>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 5: Tabs Switch (切换标签) -->
       <section id="settings-tabs" class="settings-section">
         <h2>切换标签</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">通过鼠标悬停切换标签</div>
@@ -439,13 +424,16 @@
             </label>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 5b: Common Windows Apps (常用软件) -->
       <section id="settings-common-apps" class="settings-section">
         <h2>常用软件设置</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card compact-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title" id="lbl-win-cmd">命令提示符 (cmd.exe)</div>
@@ -549,13 +537,16 @@
             </label>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 6: Maintenance (维护) -->
       <section id="settings-maintenance" class="settings-section">
         <h2>维护服务</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">修复并重载图标</div>
@@ -609,13 +600,16 @@
             <button id="btn-clean-empty-tabs" class="btn-secondary btn-sm">执行</button>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Tab 7: Import/Export (导入数据) -->
       <section id="settings-import" class="settings-section">
         <h2>备份与恢复</h2>
         <hr class="settings-divider">
-
+        <div class="settings-card-grid settings-card-grid-one">
+          <div class="settings-card">
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-title">备份配置文件</div>
@@ -635,12 +629,14 @@
             <button id="btn-import-config" class="btn-primary">导入数据</button>
           </div>
         </div>
+          </div>
+        </div>
       </section>
 
       <!-- Settings Footer -->
       <footer class="settings-footer">
-        <button id="btn-settings-save" class="btn-primary" style="font-size: 14px; padding: 10px 24px;">保存修改</button>
-        <button id="btn-settings-cancel" class="btn-secondary" style="font-size: 14px; padding: 10px 24px;">取消</button>
+        <button id="btn-settings-cancel" class="btn-secondary">取消</button>
+        <button id="btn-settings-save" class="btn-primary">保存修改</button>
       </footer>
     </main>
   </div>

@@ -113,8 +113,8 @@ body {
   width: 100%;
   height: 100%;
   background: var(--bg-app);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   display: flex;
@@ -466,7 +466,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s;
-  backdrop-filter: blur(4px);
+  backdrop-filter: none;
   z-index: 10;
 }
 
@@ -494,7 +494,7 @@ body {
   padding: 4px 0;
   width: 170px;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
   z-index: 1000;
   animation: fadeIn 0.15s ease-out;
 }
@@ -540,7 +540,7 @@ body {
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1100,7 +1100,7 @@ input:checked + .slider:before {
   align-items: center;
   justify-content: space-between;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
   z-index: 100;
   animation: slideUp 0.2s ease-out;
 }
@@ -1404,8 +1404,8 @@ body.light-theme .btn-secondary:hover {
   max-height: 200px;
   overflow-y: auto;
   animation: fadeIn 0.15s ease-out;
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .custom-select-options.active {

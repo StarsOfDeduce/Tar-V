@@ -2,6 +2,24 @@
 let config = null;
 let originalConfigStr = '';
 let deadItemsList = [];
+const ICON_EXTRACTOR_VERSION = 2;
+
+function iconRequestFromItem(item) {
+  return {
+    path: item.path || '',
+    shortcutPath: item.shortcutPath || '',
+    iconPath: item.iconPath || '',
+    iconIndex: Number.isInteger(item.iconIndex) ? item.iconIndex : 0
+  };
+}
+
+function applyIconMetadata(item, request) {
+  item.icon = '';
+  item.shortcutPath = request.shortcutPath || '';
+  item.iconPath = request.iconPath || '';
+  item.iconIndex = Number.isInteger(request.iconIndex) ? request.iconIndex : 0;
+  item.iconVersion = ICON_EXTRACTOR_VERSION;
+}
 
 // Dictionary for multi-language translation (Req 34)
 const TRANSLATIONS = {
@@ -23,6 +41,12 @@ const TRANSLATIONS = {
     titleCommonApps: "常用软件设置",
     titleMaintenance: "维护服务",
     titleImport: "备份与恢复",
+    studioSubtitle: "设置中心",
+    appearanceThemeCardTitle: "主题与色彩",
+    appearanceThemeCardStatus: "即时生效",
+    appearanceLayoutCardTitle: "布局密度",
+    appearanceTypeCardTitle: "文字尺寸",
+    studioCloseLabel: "关闭设置窗口",
 
     winCmdTitle: "命令提示符 (cmd.exe)",
     winCmdDesc: "Windows 命令行工具",
@@ -55,6 +79,8 @@ const TRANSLATIONS = {
     
     opt_style_title: "界面风格",
     opt_style_desc: "切换主面板的主题风格模式",
+    opt_settings_follow_title: "设置中心跟随界面风格",
+    opt_settings_follow_desc: "开启后，设置中心会随深色、浅色或系统模式自动切换配色",
     style_dark: "深色模式",
     style_light: "浅色模式",
     style_system: "跟随系统",
@@ -64,8 +90,12 @@ const TRANSLATIONS = {
     opt_bg_desc: "选择或输入面板的基础背景色",
     opt_accent_title: "高亮主题色",
     opt_accent_desc: "修改按钮、激活标签和边框的高亮颜色",
+    opt_settings_bg_title: "设置中心背景色",
+    opt_settings_bg_desc: "单独修改设置窗口的基础背景色",
+    opt_settings_accent_title: "设置中心强调色",
+    opt_settings_accent_desc: "修改设置窗口的标签、开关和按钮颜色",
     opt_opacity_title: "面板背景不透明度",
-    opt_opacity_desc: "调整主窗口背景透明度 (30% - 100%, 仅对非纯色模式有效)",
+    opt_opacity_desc: "调整主窗口背景透明度 (30% - 100%)",
     opt_radius_title: "圆角大小",
     opt_radius_desc: "调整主窗口四角的圆角程度",
     radius_none: "直角 (0px)",
@@ -167,6 +197,12 @@ const TRANSLATIONS = {
     titleCommonApps: "Common Windows Apps",
     titleMaintenance: "Maintenance",
     titleImport: "Backup & Restore",
+    studioSubtitle: "Settings Center",
+    appearanceThemeCardTitle: "Theme & Color",
+    appearanceThemeCardStatus: "Live",
+    appearanceLayoutCardTitle: "Layout Density",
+    appearanceTypeCardTitle: "Typography",
+    studioCloseLabel: "Close settings window",
 
     winCmdTitle: "Command Prompt (cmd.exe)",
     winCmdDesc: "Windows command-line interpreter utility",
@@ -199,6 +235,8 @@ const TRANSLATIONS = {
     
     opt_style_title: "Theme Mode",
     opt_style_desc: "Toggle color theme styling modes for the panels",
+    opt_settings_follow_title: "Follow Interface Theme",
+    opt_settings_follow_desc: "Automatically match the Settings Center to Dark, Light, or System mode",
     style_dark: "Dark Mode",
     style_light: "Light Mode",
     style_system: "Follow System",
@@ -208,6 +246,10 @@ const TRANSLATIONS = {
     opt_bg_desc: "Select or input base background hex color",
     opt_accent_title: "Accent Color",
     opt_accent_desc: "Modify accent colors for buttons, active tags, and borders",
+    opt_settings_bg_title: "Settings Background",
+    opt_settings_bg_desc: "Change the settings window background independently",
+    opt_settings_accent_title: "Settings Accent",
+    opt_settings_accent_desc: "Change the settings tabs, switches, and button color",
     opt_opacity_title: "Background Opacity",
     opt_opacity_desc: "Adjust background opacity level (30% - 100%)",
     opt_radius_title: "Border Radius",
@@ -327,6 +369,18 @@ function translateUI() {
   setSecTitle("settings-maintenance", t.titleMaintenance);
   setSecTitle("settings-import", t.titleImport);
 
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element && value) element.textContent = value;
+  };
+  setText('studio-subtitle', t.studioSubtitle);
+  setText('appearance-theme-card-title', t.appearanceThemeCardTitle);
+  setText('appearance-theme-card-status', t.appearanceThemeCardStatus);
+  setText('appearance-layout-card-title', t.appearanceLayoutCardTitle);
+  setText('appearance-type-card-title', t.appearanceTypeCardTitle);
+  const closeButton = document.getElementById('btn-window-close');
+  if (closeButton) closeButton.setAttribute('aria-label', t.studioCloseLabel);
+
   // Footer buttons
   const btnSave = document.getElementById('btn-settings-save');
   if (btnSave) btnSave.textContent = t.btnSave;
@@ -349,9 +403,11 @@ function translateUI() {
   setTranslation('opt-autostart', 'opt_autostart_title', 'opt_autostart_desc');
   setTranslation('opt-show-search', 'opt_search_title', 'opt_search_desc');
   setTranslation('opt-style-mode', 'opt_style_title', 'opt_style_desc');
+  setTranslation('opt-settings-follow-theme', 'opt_settings_follow_title', 'opt_settings_follow_desc');
   setTranslation('opt-columns', 'opt_cols_title', 'opt_cols_desc');
-  setTranslation('opt-bg-color', 'opt_bg_title', 'opt_bg_desc');
   setTranslation('opt-accent-color', 'opt_accent_title', 'opt_accent_desc');
+  setTranslation('opt-settings-bg-color', 'opt_settings_bg_title', 'opt_settings_bg_desc');
+  setTranslation('opt-settings-accent-color', 'opt_settings_accent_title', 'opt_settings_accent_desc');
   setTranslation('opt-opacity', 'opt_opacity_title', 'opt_opacity_desc');
   setTranslation('opt-radius', 'opt_radius_title', 'opt_radius_desc');
   setTranslation('opt-hide-names', 'opt_hidenames_title', 'opt_hidenames_desc');
@@ -562,11 +618,14 @@ const optAutostart = document.getElementById('opt-autostart');
 const optShowSearch = document.getElementById('opt-show-search');
 const optColumns = document.getElementById('opt-columns');
 const optStyleMode = document.getElementById('opt-style-mode');
+const optSettingsFollowTheme = document.getElementById('opt-settings-follow-theme');
 const optRadius = document.getElementById('opt-radius');
-const optBgColor = document.getElementById('opt-bg-color');
-const optBgColorPicker = document.getElementById('opt-bg-color-picker');
 const optAccentColor = document.getElementById('opt-accent-color');
 const optAccentColorPicker = document.getElementById('opt-accent-color-picker');
+const optSettingsBgColor = document.getElementById('opt-settings-bg-color');
+const optSettingsBgColorPicker = document.getElementById('opt-settings-bg-color-picker');
+const optSettingsAccentColor = document.getElementById('opt-settings-accent-color');
+const optSettingsAccentColorPicker = document.getElementById('opt-settings-accent-color-picker');
 const optOpacity = document.getElementById('opt-opacity');
 const optOpacityVal = document.getElementById('opt-opacity-val');
 const optHideNames = document.getElementById('opt-hide-names');
@@ -594,6 +653,7 @@ const optTabKeys = document.getElementById('opt-tab-keys');
 // Footer Actions
 const btnSettingsSave = document.getElementById('btn-settings-save');
 const btnSettingsCancel = document.getElementById('btn-settings-cancel');
+const btnWindowClose = document.getElementById('btn-window-close');
 
 // Maintenance Buttons
 const btnRepairIcons = document.getElementById('btn-repair-icons');
@@ -709,6 +769,9 @@ function mergeDefaultSettings() {
     borderRadius: '8px',
     bgColor: '#1e1e1e',
     accentColor: '#e04f35',
+    settingsBgColor: '#1c1c1c',
+    settingsAccentColor: '#61269c',
+    settingsFollowTheme: true,
     showSearch: true,
     fontSizeTab: 14,
     fontSizeItem: 13,
@@ -721,7 +784,7 @@ function mergeDefaultSettings() {
       config.settings[key] = defaults[key];
     }
   }
-  // Migrate old glass/liquid/original styles to dark (Req 35)
+  // Migrate legacy theme identifiers to the current solid dark theme.
   if (config.settings.styleMode === 'glass' || config.settings.styleMode === 'liquid' || config.settings.styleMode === 'original') {
     config.settings.styleMode = 'dark';
   }
@@ -733,12 +796,15 @@ function initFormValues() {
   optAutostart.checked = config.settings.autostart;
   optShowSearch.checked = config.settings.showSearch !== false;
   optColumns.value = config.settings.columns || 8;
-  optStyleMode.value = config.settings.styleMode || 'glass';
+  optStyleMode.value = config.settings.styleMode || 'dark';
+  optSettingsFollowTheme.checked = config.settings.settingsFollowTheme !== false;
   optRadius.value = config.settings.borderRadius || '8px';
-  optBgColor.value = config.settings.bgColor || '#1e1e1e';
-  optBgColorPicker.value = config.settings.bgColor || '#1e1e1e';
   optAccentColor.value = config.settings.accentColor || '#e04f35';
   optAccentColorPicker.value = config.settings.accentColor || '#e04f35';
+  optSettingsBgColor.value = config.settings.settingsBgColor || '#1c1c1c';
+  optSettingsBgColorPicker.value = config.settings.settingsBgColor || '#1c1c1c';
+  optSettingsAccentColor.value = config.settings.settingsAccentColor || '#61269c';
+  optSettingsAccentColorPicker.value = config.settings.settingsAccentColor || '#61269c';
   
   const op = config.settings.opacity !== undefined ? config.settings.opacity : 85;
   optOpacity.value = op;
@@ -799,43 +865,96 @@ function initFormValues() {
   });
 }
 
+function updateStudioPreview() {
+  if (!config || !config.settings) return;
+  const lang = config.settings.language || 'zh';
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.zh;
+  const styleMode = config.settings.styleMode || 'dark';
+  const styleLabels = {
+    dark: t.style_dark,
+    light: t.style_light,
+    system: t.style_system
+  };
+  const previewValue = document.getElementById('appearance-preview-value');
+  if (previewValue) {
+    previewValue.textContent = `${styleLabels[styleMode] || styleLabels.dark} · ${config.settings.opacity ?? 85}%`;
+  }
+  const layoutStatus = document.getElementById('appearance-layout-card-status');
+  if (layoutStatus) {
+    layoutStatus.textContent = lang === 'en'
+      ? `${config.settings.columns || 8} columns`
+      : `${config.settings.columns || 8} 列`;
+  }
+}
+
+function getSettingsPalette() {
+  const followsTheme = config.settings.settingsFollowTheme !== false;
+  if (!followsTheme) {
+    return {
+      background: config.settings.settingsBgColor || '#1c1c1c',
+      accent: config.settings.settingsAccentColor || '#61269c',
+      followsTheme
+    };
+  }
+
+  const styleMode = config.settings.styleMode || 'dark';
+  const usesLightTheme = styleMode === 'light' || (
+    styleMode === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  return {
+    background: usesLightTheme ? '#ffffff' : '#1c1c1c',
+    accent: '#61269c',
+    followsTheme
+  };
+}
+
+function syncSettingsColorControls(palette) {
+  const background = palette.followsTheme
+    ? palette.background
+    : (config.settings.settingsBgColor || '#1c1c1c');
+  const accent = palette.followsTheme
+    ? palette.accent
+    : (config.settings.settingsAccentColor || '#61269c');
+  optSettingsBgColor.value = background;
+  optSettingsBgColorPicker.value = background;
+  optSettingsAccentColor.value = accent;
+  optSettingsAccentColorPicker.value = accent;
+  optSettingsBgColor.readOnly = palette.followsTheme;
+  optSettingsAccentColor.readOnly = palette.followsTheme;
+  optSettingsBgColorPicker.disabled = palette.followsTheme;
+  optSettingsAccentColorPicker.disabled = palette.followsTheme;
+}
+
 // Dynamically apply visual settings to this window in real-time
 function applyAppearanceSettings() {
-  const styleMode = config.settings.styleMode || 'dark';
   const radius = config.settings.borderRadius || '8px';
   const accentColor = config.settings.accentColor || '#e04f35';
-  const opacity = config.settings.opacity !== undefined ? config.settings.opacity : 85;
-  const alpha = opacity / 100;
+  const palette = getSettingsPalette();
+  const settingsBgColor = palette.background;
+  const settingsAccentColor = palette.accent;
 
-  // Set theme background color with opacity (Req 35)
-  let baseColor = { r: 30, g: 30, b: 30 }; // dark theme background
-  if (styleMode === 'light' || (styleMode === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    baseColor = { r: 245, g: 245, b: 247 }; // light theme background
-  }
-
-  // Apply theme class to body
+  // Keep the settings window readable independently from the launcher's theme.
+  const settingsRgb = hexToRgb(settingsBgColor);
+  const settingsLuma = (settingsRgb.r * 299 + settingsRgb.g * 587 + settingsRgb.b * 114) / 1000;
   document.body.classList.remove('light-theme', 'dark-theme');
-  if (styleMode === 'light') {
-    document.body.classList.add('light-theme');
-  } else if (styleMode === 'dark') {
-    document.body.classList.add('dark-theme');
-  } else if (styleMode === 'system') {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.classList.add(isDark ? 'dark-theme' : 'light-theme');
-  }
+  document.body.classList.add(settingsLuma >= 155 ? 'light-theme' : 'dark-theme');
 
   // Apply accent color
   document.documentElement.style.setProperty('--accent', accentColor);
   document.documentElement.style.setProperty('--border-focus', accentColor);
   document.documentElement.style.setProperty('--accent-gradient', accentColor);
   document.documentElement.style.setProperty('--accent-light', lightenColor(accentColor, 15));
+  document.documentElement.style.setProperty('--settings-bg-custom', settingsBgColor);
+  document.documentElement.style.setProperty('--studio-accent', settingsAccentColor);
+  document.body.style.setProperty('--settings-bg-custom', settingsBgColor);
+  document.body.style.setProperty('--studio-accent', settingsAccentColor);
 
   // Apply background styles to container/body
   const container = document.querySelector('.settings-window-container') || document.body;
   if (container) {
-    container.style.background = `rgba(${baseColor.r}, ${baseColor.g}, ${baseColor.b}, ${alpha})`;
-    container.style.backdropFilter = 'blur(20px)';
-    container.style.webkitBackdropFilter = 'blur(20px)';
+    container.style.backgroundColor = settingsBgColor;
+    container.style.backdropFilter = 'none';
+    container.style.webkitBackdropFilter = 'none';
   }
 
   // Apply rounded corners container styling
@@ -856,11 +975,13 @@ function applyAppearanceSettings() {
   // Dynamically update this settings window's content text sizes
   document.body.style.fontSize = `${fsSettings}px`;
   // Apply settings font size specifically to elements
-  document.querySelectorAll('.setting-title').forEach(el => el.style.fontSize = `${fsSettings}px`);
-  document.querySelectorAll('.setting-desc').forEach(el => el.style.fontSize = `${fsSettings - 3}px`);
-  document.querySelectorAll('.sidebar-item').forEach(el => el.style.fontSize = `${fsSettings}px`);
+  document.querySelectorAll('.setting-title').forEach(el => el.style.fontSize = `${fsSettings + 2}px`);
+  document.querySelectorAll('.setting-desc').forEach(el => el.style.fontSize = `${fsSettings - 1}px`);
+  document.querySelectorAll('.sidebar-item').forEach(el => el.style.fontSize = `${fsSettings + 3}px`);
   document.querySelectorAll('.custom-select-trigger').forEach(el => el.style.fontSize = `${fsSettings - 1}px`);
   document.querySelectorAll('.custom-select-option').forEach(el => el.style.fontSize = `${fsSettings - 1}px`);
+  syncSettingsColorControls(palette);
+  updateStudioPreview();
 }
 
 function hexToRgb(hex) {
@@ -885,6 +1006,12 @@ function lightenColor(hex, percent) {
 
 // Bind form event listeners
 function setupEventListeners() {
+  const previewMainAppearance = () => {
+    window.api.previewAppearance(config).catch((error) => {
+      console.error('Failed to preview appearance settings', error);
+    });
+  };
+
   // 1. Sidebar tab switching
   sidebarItems.forEach(item => {
     item.addEventListener('click', () => {
@@ -901,6 +1028,7 @@ function setupEventListeners() {
   optLanguage.addEventListener('change', (e) => {
     config.settings.language = e.target.value;
     translateUI();
+    updateStudioPreview();
   });
 
   optAutostart.addEventListener('change', (e) => {
@@ -913,32 +1041,25 @@ function setupEventListeners() {
 
   optColumns.addEventListener('change', (e) => {
     config.settings.columns = parseInt(e.target.value);
+    updateStudioPreview();
+    previewMainAppearance();
   });
 
   optStyleMode.addEventListener('change', (e) => {
     config.settings.styleMode = e.target.value;
+    applyAppearanceSettings();
+    previewMainAppearance();
+  });
+
+  optSettingsFollowTheme.addEventListener('change', (e) => {
+    config.settings.settingsFollowTheme = e.target.checked;
     applyAppearanceSettings();
   });
 
   optRadius.addEventListener('change', (e) => {
     config.settings.borderRadius = e.target.value;
     applyAppearanceSettings();
-  });
-
-  optBgColorPicker.addEventListener('input', (e) => {
-    const val = e.target.value;
-    optBgColor.value = val;
-    config.settings.bgColor = val;
-    applyAppearanceSettings();
-  });
-
-  optBgColor.addEventListener('input', (e) => {
-    const val = e.target.value.trim();
-    if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
-      optBgColorPicker.value = val;
-      config.settings.bgColor = val;
-      applyAppearanceSettings();
-    }
+    previewMainAppearance();
   });
 
   optAccentColorPicker.addEventListener('input', (e) => {
@@ -946,6 +1067,7 @@ function setupEventListeners() {
     optAccentColor.value = val;
     config.settings.accentColor = val;
     applyAppearanceSettings();
+    previewMainAppearance();
   });
 
   optAccentColor.addEventListener('input', (e) => {
@@ -953,6 +1075,39 @@ function setupEventListeners() {
     if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
       optAccentColorPicker.value = val;
       config.settings.accentColor = val;
+      applyAppearanceSettings();
+      previewMainAppearance();
+    }
+  });
+
+  optSettingsBgColorPicker.addEventListener('input', (e) => {
+    const val = e.target.value;
+    optSettingsBgColor.value = val;
+    config.settings.settingsBgColor = val;
+    applyAppearanceSettings();
+  });
+
+  optSettingsBgColor.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
+      optSettingsBgColorPicker.value = val;
+      config.settings.settingsBgColor = val;
+      applyAppearanceSettings();
+    }
+  });
+
+  optSettingsAccentColorPicker.addEventListener('input', (e) => {
+    const val = e.target.value;
+    optSettingsAccentColor.value = val;
+    config.settings.settingsAccentColor = val;
+    applyAppearanceSettings();
+  });
+
+  optSettingsAccentColor.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
+      optSettingsAccentColorPicker.value = val;
+      config.settings.settingsAccentColor = val;
       applyAppearanceSettings();
     }
   });
@@ -962,10 +1117,12 @@ function setupEventListeners() {
     optOpacityVal.textContent = val + '%';
     config.settings.opacity = val;
     applyAppearanceSettings();
+    previewMainAppearance();
   });
 
   optHideNames.addEventListener('change', (e) => {
     config.settings.hideNames = e.target.checked;
+    previewMainAppearance();
   });
 
   // Font size slider listeners
@@ -974,6 +1131,7 @@ function setupEventListeners() {
     optFontSizeTabVal.textContent = val + 'px';
     config.settings.fontSizeTab = val;
     applyAppearanceSettings();
+    previewMainAppearance();
   });
 
   optFontSizeItem.addEventListener('input', (e) => {
@@ -981,6 +1139,7 @@ function setupEventListeners() {
     optFontSizeItemVal.textContent = val + 'px';
     config.settings.fontSizeItem = val;
     applyAppearanceSettings();
+    previewMainAppearance();
   });
 
   optFontSizeSettings.addEventListener('input', (e) => {
@@ -988,6 +1147,7 @@ function setupEventListeners() {
     optFontSizeSettingsVal.textContent = val + 'px';
     config.settings.fontSizeSettings = val;
     applyAppearanceSettings();
+    previewMainAppearance();
   });
 
   // Click mode, autohides, hotkey, esc, popup pos
@@ -1086,19 +1246,20 @@ function setupEventListeners() {
           (item.path.toLowerCase() === targetLower || item.path.toLowerCase().endsWith('\\' + targetLower))
         );
         if (!exists) {
-          // Fetch system icon async
           checkbox.disabled = true;
           try {
-            const iconDataUrl = await window.api.getFileIcon(path);
-            config.items.push({
+            const request = await window.api.resolveIconRequest({ path });
+            const item = {
               id: 'win-app-' + path.replace('.', '-') + '-' + Date.now(),
               tabId: commonTabId,
               name: name,
               path: path,
               args: '',
               runAsAdmin: false,
-              icon: iconDataUrl
-            });
+              icon: ''
+            };
+            applyIconMetadata(item, request);
+            config.items.push(item);
           } catch (err) {
             console.error('Failed to get icon for ' + path, err);
             // Fallback icon
@@ -1109,7 +1270,11 @@ function setupEventListeners() {
               path: path,
               args: '',
               runAsAdmin: false,
-              icon: ''
+              icon: '',
+              shortcutPath: '',
+              iconPath: '',
+              iconIndex: 0,
+              iconVersion: 0
             });
           } finally {
             checkbox.disabled = false;
@@ -1147,6 +1312,12 @@ function setupEventListeners() {
     window.close();
   });
 
+  if (btnWindowClose) {
+    btnWindowClose.addEventListener('click', () => {
+      window.close();
+    });
+  }
+
   // Maintenance Button Logic
 
   // 1. Repair and refresh all icons
@@ -1157,12 +1328,23 @@ function setupEventListeners() {
     btnRepairIcons.disabled = true;
     btnRepairIcons.textContent = t.msg_reloading;
     try {
+      let repaired = 0;
+      let failed = 0;
       for (let i = 0; i < config.items.length; i++) {
         const item = config.items[i];
-        item.icon = await window.api.getFileIcon(item.path, true);
+        try {
+          const request = await window.api.resolveIconRequest(iconRequestFromItem(item));
+          await window.api.getFileIcon(request, true);
+          applyIconMetadata(item, request);
+          repaired++;
+        } catch (err) {
+          failed++;
+          console.error('Failed to repair icon:', item.name, err);
+        }
       }
       await window.api.saveConfig(config);
-      await showCustomAlert(t.msg_repair_success);
+      const result = failed > 0 ? `${t.msg_repair_success} (${repaired} / ${config.items.length}, ${failed} failed)` : t.msg_repair_success;
+      await showCustomAlert(result);
     } catch (err) {
       await showCustomAlert(t.msg_repair_fail + err.message);
     } finally {
@@ -1206,7 +1388,7 @@ function setupEventListeners() {
     const t = TRANSLATIONS[lang] || TRANSLATIONS.zh;
     
     const absItems = config.items.filter(item => {
-      return item.path && !item.path.startsWith('http://') && !item.path.startsWith('https://') && item.path.includes('\\');
+      return item.path && !/^[a-z][a-z0-9+.-]*:\/\//i.test(item.path) && item.path.includes('\\');
     });
 
     if (absItems.length === 0) {

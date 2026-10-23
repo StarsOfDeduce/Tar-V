@@ -2,6 +2,12 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 let dropCallback = null;
 
+function subscribe(channel, callback, mapArgs = (...args) => args) {
+  const listener = (event, ...args) => callback(...mapArgs(...args));
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
 // PRIVILEGED DOM Drag & Drop Orchestrator
 // We bind drag/drop events in preload because:
 // 1. We must prevent browser defaults on dragover to enable dropping in Chromium
@@ -61,7 +67,9 @@ window.addEventListener('drop', (e) => {
 contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-  getFileIcon: (filePath, forceRefresh = false) => ipcRenderer.invoke('get-file-icon', filePath, forceRefresh),
+  previewAppearance: (config) => ipcRenderer.invoke('preview-appearance', config),
+  getFileIcon: (request, forceRefresh = false) => ipcRenderer.invoke('get-file-icon', request, forceRefresh),
+  resolveIconRequest: (request) => ipcRenderer.invoke('resolve-icon-request', request),
   launchItem: (itemId, forceRunAsAdmin = false) => ipcRenderer.invoke('launch-item', itemId, forceRunAsAdmin),
   showItemInFolder: (itemId) => ipcRenderer.invoke('show-item-in-folder', itemId),
   selectFile: () => ipcRenderer.invoke('select-file'),
@@ -81,14 +89,18 @@ contextBridge.exposeInMainWorld('api', {
   // Custom Drag & Drop listener registration
   onFilesDropped: (callback) => {
     dropCallback = callback;
+    return () => {
+      if (dropCallback === callback) dropCallback = null;
+    };
   },
   
   // Event listeners
-  onWindowShow: (callback) => ipcRenderer.on('window-show', () => callback()),
-  onWindowHide: (callback) => ipcRenderer.on('window-hide', () => callback()),
+  onWindowShow: (callback) => subscribe('window-show', callback),
+  onWindowHide: (callback) => subscribe('window-hide', callback),
   
   // Independent Settings Window APIs
   openSettingsWindow: () => ipcRenderer.invoke('open-settings-window'),
-  onConfigUpdated: (callback) => ipcRenderer.on('config-updated', (event, newConfig) => callback(newConfig)),
-  onImportSuccess: (callback) => ipcRenderer.on('show-import-success', () => callback())
+  onConfigUpdated: (callback) => subscribe('config-updated', callback, (newConfig) => [newConfig]),
+  onAppearancePreview: (callback) => subscribe('appearance-preview', callback, (settings) => [settings]),
+  onImportSuccess: (callback) => subscribe('show-import-success', callback)
 });

@@ -12,6 +12,13 @@ const { isInside, hasTraversal, createDirAuthorizer } = require('../lib/path-gua
 const { validateConfig } = require('../lib/config-schema');
 const { selectConfiguredLaunch } = require('../lib/launch-policy');
 const { isTrustedIpcEvent, hardenRendererWindow } = require('../lib/security-boundary');
+const { WeightedLruCache } = require('../lib/icon-cache');
+const {
+  parseInternetShortcutBuffer,
+  normalizeShellShortcut,
+  isProtocolTarget,
+  steamAppId
+} = require('../lib/shortcut');
 
 let passed = 0;
 const failures = [];
@@ -162,6 +169,14 @@ test('buildProcessStartScript 对文件名中的单引号做转义', () => {
 test('buildIconExtractScript 路径被单引号包裹', () => {
   const script = buildIconExtractScript("C:\\a'b\\x.exe");
   assert.ok(script.includes("'C:\\a''b\\x.exe'"));
+  assert.ok(script.includes('$icon.Dispose()'));
+  assert.ok(script.includes('$stream.Dispose()'));
+});
+
+test('buildIconExtractScript 支持指定资源索引', () => {
+  const script = buildIconExtractScript('C:\\icons.dll', 3);
+  assert.ok(script.includes('ExtractIconEx'));
+  assert.ok(script.includes("'C:\\icons.dll', 3"));
 });
 
 // ---------------------------------------------------------------- path-guard
@@ -205,7 +220,10 @@ test('authorizer allowParentOf 放行所选文件所在目录', () => {
 console.log('\n[lib/config-schema]');
 
 const baseConfig = () => ({
-  settings: { language: 'zh', autostart: false, hotkey: 'Alt+Q', columns: 8, opacity: 85 },
+  settings: {
+    language: 'zh', autostart: false, hotkey: 'Alt+Q', columns: 8, opacity: 85,
+    settingsBgColor: '#1c1c1c', settingsAccentColor: '#61269c', settingsFollowTheme: true
+  },
   tabs: [{ id: 'tab-1', name: '常用' }],
   items: [
     { id: 'i1', tabId: 'tab-1', name: 'cmd', path: 'cmd.exe', args: '', runAsAdmin: false, icon: '' }
@@ -216,6 +234,15 @@ test('合法配置通过', () => {
   const result = validateConfig(baseConfig());
   assert.strictEqual(result.ok, true, result.errors.join('; '));
   assert.strictEqual(result.value.items.length, 1);
+  assert.strictEqual(result.value.settings.settingsAccentColor, '#61269c');
+});
+
+test('设置中心颜色仅接受完整十六进制值', () => {
+  const cfg = baseConfig();
+  cfg.settings.settingsBgColor = 'url(javascript:alert(1))';
+  const result = validateConfig(cfg);
+  assert.strictEqual(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('settingsBgColor')));
 });
 
 test('未知顶层字段被拒绝', () => {
@@ -294,6 +321,79 @@ test('重复的 tab 和 item ID 被拒绝', () => {
   const duplicateItem = baseConfig();
   duplicateItem.items.push({ ...duplicateItem.items[0] });
   assert.strictEqual(validateConfig(duplicateItem).ok, false);
+});
+
+test('图标元数据通过校验并规范化', () => {
+  const cfg = baseConfig();
+  Object.assign(cfg.items[0], {
+    shortcutPath: 'C:\\Desktop\\App.lnk',
+    iconPath: 'C:\\App\\app.ico',
+    iconIndex: 2,
+    iconVersion: 2
+  });
+  const result = validateConfig(cfg);
+  assert.strictEqual(result.ok, true, result.errors.join('; '));
+  assert.strictEqual(result.value.items[0].iconIndex, 2);
+  assert.strictEqual(result.value.items[0].iconVersion, 2);
+});
+
+test('非法图标索引被拒绝', () => {
+  const cfg = baseConfig();
+  cfg.items[0].iconIndex = 1.5;
+  assert.strictEqual(validateConfig(cfg).ok, false);
+});
+
+// ---------------------------------------------------------------- shortcuts/icons
+console.log('\n[lib/shortcut + icon-cache]');
+
+test('.url 解析 URL、环境变量图标与索引', () => {
+  const buffer = Buffer.from('[InternetShortcut]\r\nURL=steam://rungameid/123\r\nIconFile=%TESTROOT%\\game.ico,4\r\n', 'utf8');
+  const result = parseInternetShortcutBuffer(buffer, {
+    sourcePath: 'C:\\Desktop\\Game.url',
+    env: { TESTROOT: 'D:\\Steam' }
+  });
+  assert.strictEqual(result.target, 'steam://rungameid/123');
+  assert.strictEqual(result.iconPath, 'D:\\Steam\\game.ico');
+  assert.strictEqual(result.iconIndex, 4);
+  assert.strictEqual(result.shortcutPath, 'C:\\Desktop\\Game.url');
+});
+
+test('.url 支持 UTF-16LE BOM 与独立 IconIndex', () => {
+  const text = '[InternetShortcut]\r\nURL=https://example.test\r\nIconFile="C:\\A B\\icons.dll"\r\nIconIndex=-7\r\n';
+  const buffer = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+  const result = parseInternetShortcutBuffer(buffer);
+  assert.strictEqual(result.iconPath, 'C:\\A B\\icons.dll');
+  assert.strictEqual(result.iconIndex, -7);
+});
+
+test('.lnk 保留显式 icon 与 iconIndex', () => {
+  const result = normalizeShellShortcut('C:\\Desktop\\App.lnk', {
+    target: 'C:\\App\\App.exe',
+    args: '--safe',
+    cwd: 'C:\\App',
+    icon: 'C:\\App\\icons.dll',
+    iconIndex: 5
+  });
+  assert.strictEqual(result.iconPath, 'C:\\App\\icons.dll');
+  assert.strictEqual(result.iconIndex, 5);
+  assert.strictEqual(result.shortcutPath, 'C:\\Desktop\\App.lnk');
+});
+
+test('协议与 Steam appid 识别', () => {
+  assert.strictEqual(isProtocolTarget('steam://rungameid/2001120'), true);
+  assert.strictEqual(steamAppId('steam://rungameid/2001120'), '2001120');
+  assert.strictEqual(isProtocolTarget('C:\\Games\\game.exe'), false);
+});
+
+test('加权 LRU 同时执行条目和字节上限', () => {
+  const cache = new WeightedLruCache({ maxEntries: 2, maxBytes: 8 });
+  cache.set('a', '1111');
+  cache.set('b', '22');
+  assert.strictEqual(cache.get('a'), '1111');
+  cache.set('c', '3333');
+  assert.strictEqual(cache.get('b'), undefined);
+  assert.strictEqual(cache.size, 2);
+  assert.ok(cache.bytes <= 8);
 });
 
 // ---------------------------------------------------------------- launch-policy

@@ -1,176 +1,299 @@
 <p align="center">
-  <img src="tray.png" width="96" alt="Tar V logo">
+  <img src="tray.png" width="96" alt="Tar V 图标">
 </p>
 
 <h1 align="center">Tar V</h1>
 
 <p align="center">
-  <b>A polished, minimal launcher panel for Windows</b><br>
-  <sub>Global hotkey · glass-inspired interface · groups · drag-and-drop organization</sub>
+  <strong>快速、简洁、可定制的 Windows 本地启动面板</strong><br>
+  <sub>应用、游戏、文件、文件夹与快捷方式，一处集中管理。</sub>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.6-blue?style=flat-square" alt="Version 1.0.6">
-  <img src="https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows" alt="Windows">
+  简体中文 · <a href="README_EN.md">English</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-61269C?style=flat-square" alt="Version 2.0.0">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Windows 10 and 11">
   <img src="https://img.shields.io/badge/framework-Electron-47848F?style=flat-square&logo=electron" alt="Electron">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
+  <img src="https://img.shields.io/badge/license-MIT-2EA44F?style=flat-square" alt="MIT License">
 </p>
 
-## Preview
+## 项目简介
+
+Tar V 是一款面向 Windows 的本地快捷启动工具。它把应用、Steam 游戏、文件、文件夹、网址和快捷方式集中到一个可随时呼出的面板中，让常用内容不必散落在桌面、开始菜单和多级目录里。
+
+你可以通过全局快捷键打开 Tar V，按分组浏览或搜索项目，然后直接启动。面板支持拖放添加、标签管理、批量编辑、管理员启动、自动收起以及多种键鼠切换方式；所有配置与图标缓存均保存在本机，不需要账号或云端服务。
+
+## 2.0.0 重大更新
+
+Tar V 2.0.0 不是简单的界面换色，而是围绕图标兼容、设置体验、性能与安全进行的一次整体重构。
+
+### 更可靠的 Windows 图标读取
+
+- 改进 `.exe`、`.lnk`、`.url`、文件夹和普通文件的图标解析。
+- 支持快捷方式指定的图标文件与资源索引，不再只读取目标程序的默认图标。
+- 改进 Steam 等协议型游戏快捷方式的识别，并提供稳定的协议图标回退。
+- 使用受限的内存缓存、磁盘缓存和任务队列，避免重复提取图标阻塞界面。
+- 图标无法读取时使用明确的文件、文件夹或网页回退图标，不再显示损坏图片。
+- “维护”页面可重新扫描并修复已有项目的图标。
+
+### 全新的设置中心
+
+- 采用紧凑的横向分类导航，减少层级与无效装饰。
+- 支持深色、浅色和跟随系统三种界面风格。
+- 新增“设置中心跟随界面风格”选项：开启时自动使用内置深浅色方案，关闭后可以单独配置设置中心背景色与强调色。
+- 外观设置可以即时预览；取消时恢复原有外观，保存后正式写入配置。
+- 重新整理字号、控件、开关、分隔线与操作按钮，提升不同窗口尺寸下的可读性和操作空间。
+- 全部界面采用统一的纯色视觉体系。
+
+### 性能、稳定性与安全
+
+- 图标数据不再长期写入主配置，降低配置体积和重复内存占用。
+- 图标缓存同时限制条目数量与总字节数，避免无限增长。
+- 设置窗口关闭后释放引用；重复打开和关闭不会残留窗口实例。
+- 加强配置导入校验、启动参数处理、IPC 来源验证和文件访问边界。
+- Renderer 继续启用 Electron 沙箱与上下文隔离，并通过严格的内容安全策略阻止远程脚本和内联脚本。
+- 发布前自动检查安装包中是否包含本机路径、常见密钥或个人数据特征。
+
+## 界面预览
+
+### 启动面板
 
 <p align="center">
-  <img src="docs/screenshots/panel.png" width="720" alt="Tar V launcher panel">
+  <img src="docs/screenshots/panel.png" width="760" alt="Tar V 启动面板">
   <br>
-  <sub>Launcher panel with groups, search, and native Windows icons</sub>
+  <sub>分组、搜索、Windows 原生图标与快捷启动</sub>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/settings.png" width="620" alt="Tar V settings">
-  <br>
-  <sub>Independent settings center with eight configuration areas</sub>
-</p>
+### 设置中心
 
-> The screenshots use built-in Windows applications as sample data and do not expose personal files or paths.
+<table>
+  <tr>
+    <td align="center"><strong>深色模式</strong></td>
+    <td align="center"><strong>浅色模式</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/settings.png" alt="Tar V 深色设置中心"></td>
+    <td><img src="docs/screenshots/settings-light.png" alt="Tar V 浅色设置中心"></td>
+  </tr>
+</table>
 
-## Overview
+> 截图使用测试配置与 Windows 内置项目，不包含个人文件、账号或本机路径。
 
-Tar V is a glass-inspired launcher panel built specifically for Windows. It replaces a crowded desktop with a lightweight, highly configurable panel for applications, files, folders, URLs, and shortcuts.
+## 主要功能
 
-Open the panel with a global hotkey, search or switch groups, and launch an item without returning to the desktop or Start menu.
+### 快速呼出与启动
 
-## Features
+- 使用可自定义的全局快捷键显示或隐藏面板。
+- 支持单击或双击启动。
+- 支持普通用户权限启动和单次管理员权限启动。
+- 可在启动项目后自动收起，也可在面板失去焦点或按下 `Esc` 时收起。
+- 面板可显示在屏幕中央或鼠标指针附近。
 
-### Appearance
+### 项目与分组管理
 
-- Dark, light, and system themes.
-- Configurable background color, accent color, opacity, and corner radius.
-- Adjustable grid width and independent font sizes for tabs, launcher items, and Settings.
-- Optional hidden item labels for an icon-only layout.
+- 支持应用、游戏、文件、文件夹、网址、`.lnk` 和 `.url` 快捷方式。
+- 将文件、文件夹或快捷方式拖入面板即可添加。
+- 支持从文件夹批量导入项目。
+- 可新增、重命名、删除和拖动排序分组。
+- 项目可使用插入排序或位置交换两种拖动模式。
+- 右键菜单支持启动、管理员启动、打开位置、编辑和删除。
 
-### Native Windows items and icons
+### 搜索与批量操作
 
-Tar V preserves icons for local files, folders, `.lnk` shortcuts, and `.url` shortcuts such as Steam games. Icon extraction is cached and scheduled through a bounded worker queue to keep the interface responsive.
+- 输入关键词即时筛选名称和所属分组。
+- 批量移动项目、修改启动参数或管理员启动设置。
+- 按名称整理项目并清除重复项。
+- 扫描失效路径并清理不存在的本地目标。
+- 清理空分组。
 
-### Drag-and-drop organization
+### 个性化
 
-- Drop files, folders, URLs, `.lnk` files, or `.url` files onto the panel to create items.
-- Reorder cards by insertion or swap behavior.
-- Drag group tabs to rearrange them.
+- 深色、浅色和跟随系统主题。
+- 自定义启动面板强调色、透明度和圆角大小。
+- 独立设置启动面板与设置中心的配色关系。
+- 调整每行图标数量以及标签、项目和设置文字大小。
+- 可隐藏项目名称，使用纯图标布局。
 
-### Search and batch management
+### 多种分组切换方式
 
-- Filter launcher items immediately with fuzzy keyword matching.
-- Select several items to delete them, edit launch arguments or elevation settings, or move them to another group.
-- Sort all items, remove duplicates, scan for missing local targets, and delete empty groups.
+- 点击标签切换。
+- 鼠标悬停切换。
+- 鼠标滚轮循环切换。
+- 数字键 `1`–`9` 快速切换。
 
-### Eight-part settings center
+### 备份与恢复
 
-| Area | Controls |
+- 将分组、项目和设置导出为 JSON 备份。
+- 导入前执行字段、类型、长度和关联关系校验。
+- 应用备份前显示变更摘要，并特别提示开机启动、全局快捷键和管理员启动项目。
+
+## 设置中心
+
+| 分类 | 可配置内容 |
 | :--- | :--- |
-| **General** | Simplified Chinese / English, launch at sign-in, search-box visibility |
-| **Appearance** | Theme, columns, colors, opacity, corners, labels, and font sizes |
-| **Preferences** | Single/double-click launch, drag behavior, collapse after launch, collapse on blur |
-| **Show and hide** | Global hotkey, `Esc` behavior, center-screen or pointer-relative placement |
-| **Group switching** | Hover switching, global mouse wheel, number keys 1–9 |
-| **Common apps** | One-click entries for built-in Windows tools |
-| **Maintenance** | Icon repair, sorting, duplicate cleanup, missing-target cleanup, empty-group cleanup |
-| **Backup and restore** | Export configuration to JSON or review and confirm an imported backup |
+| **常规** | 显示语言、开机启动、搜索框显示 |
+| **外观** | 界面风格、设置中心跟随模式、配色、透明度、圆角、列数、项目名称和字号 |
+| **偏好** | 单击/双击启动、拖动行为、启动后收起、失焦收起 |
+| **唤出与收起** | 全局快捷键、`Esc` 行为、窗口位置与居中 |
+| **切换标签** | 悬停、滚轮和数字键切换 |
+| **常用软件** | Windows 内置工具的快捷入口 |
+| **维护** | 图标修复、排序、去重、失效路径和空分组清理 |
+| **备份与恢复** | 导出配置、审查并导入备份 |
 
-## Installation
+## 安装与升级
 
-Download the latest installer from [Releases](../../releases), then run `Tar V Setup 1.0.6.exe`.
+### 安装
 
-The NSIS installer can create desktop and Start menu shortcuts, supports a custom installation directory, and registers Tar V with Windows uninstall settings.
+1. 从 [Releases](../../releases) 下载 `Tar V Setup 2.0.0.exe`。
+2. 运行安装程序并选择安装目录。
+3. 根据需要创建桌面快捷方式和开始菜单快捷方式。
+4. 启动 Tar V，在设置中心配置全局快捷键和常用项目。
 
-## Security model
+安装包使用 NSIS 构建，支持自定义安装目录，并注册到 Windows 的应用卸载列表。
 
-Tar V launches local programs, reads icons, and resolves shortcuts, so several features cross normal desktop security boundaries. The application constrains those capabilities as follows:
+### 从 1.x 升级
 
-| Boundary | Control |
+2.0.0 会为新增设置补充默认值，并继续读取原有分组和项目。升级前仍建议先在“备份与恢复”中导出 JSON，以便随时恢复。
+
+## 图标兼容说明
+
+Tar V 会依次参考项目路径、快捷方式本身、快捷方式声明的图标文件和资源索引。协议链接无法直接提取本地图标时，会根据协议类型选择回退图标。
+
+如果升级后个别项目仍显示旧图标：
+
+1. 打开“设置中心 → 维护”。
+2. 运行图标修复。
+3. 如有需要，重新添加原始 `.lnk` 或 `.url` 快捷方式，而不是只添加解析后的目标路径。
+
+部分游戏平台会在更新游戏或客户端后更换本地图标资源；遇到这种情况时再次运行图标修复即可。
+
+## 安全设计
+
+Tar V 需要启动本地程序、解析快捷方式和读取图标，因此会跨越普通网页应用不具备的桌面权限边界。项目对这些能力进行了以下约束：
+
+| 边界 | 防护措施 |
 | :--- | :--- |
-| **Launch arguments** | Parses arguments into an array and creates the process without a shell. Batch-file arguments use dedicated `cmd` escaping and reject `%` / `!` expansion payloads. |
-| **Elevated launch** | Requests elevation through the Windows UAC interface and passes arguments literally rather than composing a shell command. |
-| **PowerShell calls** | Uses `-EncodedCommand` and avoids a second `cmd.exe` parsing pass. |
-| **Renderer isolation** | Enables `sandbox` and `contextIsolation`, disables `nodeIntegration`, and blocks external navigation and pop-ups. |
-| **Content Security Policy** | Both renderer pages reject remote scripts, inline scripts, and inline event handlers. |
-| **Fonts** | Bundles Inter locally instead of loading it from a CDN. |
-| **Configuration import** | Applies a field and type allowlist, then shows a summary and requires confirmation for sensitive changes such as autostart, hotkeys, and elevated items. |
-| **IPC** | Privileged handlers validate the source window, top-level frame, and local page URL. Launch requests contain an item ID; the main process reloads the path and arguments from validated configuration. |
+| **启动参数** | 将参数解析为数组，在不经过 Shell 的情况下创建进程；批处理文件使用独立转义并拒绝 `%VAR%` 与 `!VAR!` 展开载荷。 |
+| **管理员启动** | 通过 Windows UAC 请求授权，目标和参数分开处理，不把用户输入直接拼接成命令。 |
+| **PowerShell** | 使用 UTF-16LE `EncodedCommand`，路径和参数按字面值传递。 |
+| **Renderer 隔离** | 开启 `sandbox` 和 `contextIsolation`，关闭 `nodeIntegration`，阻止外部导航与弹窗。 |
+| **内容安全策略** | 禁止远程脚本、内联脚本、内联事件和插件对象；字体随应用本地提供。 |
+| **配置导入** | 只接受允许的字段与类型，限制数量和字符串长度，拒绝悬空分组和重复 ID，并要求确认敏感变更。 |
+| **IPC** | 校验来源窗口、顶层 Frame 与本地页面地址；启动请求只提交项目 ID，主进程从已验证配置重新读取真实目标。 |
+| **文件访问** | 对路径进行规范化和边界检查，仅向已经授权的文件或目录开放相关操作。 |
+| **发行检查** | 扫描打包内容中的本机路径、凭据模式和个人信息特征。 |
 
-To report a security issue, use a GitHub Security Advisory when available, or open an issue without publishing exploitable details.
+请通过 GitHub Security Advisory 私下报告安全问题；不要在公开 Issue 中发布可直接利用的细节。
 
-## Development
+## 本地数据与隐私
 
-Requirements:
+- Tar V 不要求登录账号。
+- 配置、备份和图标缓存默认保存在本机。
+- 项目不会把启动列表或本地路径上传到云端。
+- 公开反馈问题时，请先遮挡截图中的用户名、文件路径和私人应用名称。
 
-- Windows 10 or 11
-- Node.js LTS (Node.js 20 or later recommended)
+## 开发
+
+### 环境要求
+
+- Windows 10 或 Windows 11（x64）
+- Node.js 20 或更高版本
 - npm
 
+### 获取源码
+
 ```powershell
-git clone https://github.com/StarsofDeduce/Tar-V.git
+git clone https://github.com/StarsOfDeduce/Tar-V.git
 cd Tar-V
 npm install
 npm start
 ```
 
-### Tests
+### 测试
+
+运行 Node.js 功能与安全测试：
 
 ```powershell
 npm test
 ```
 
-The Node.js test suite covers launch argument handling, `cmd` escaping, path boundaries, configuration validation, and injection-payload rejection.
+测试覆盖参数解析、`cmd` 与 PowerShell 转义、路径边界、配置校验、快捷方式解析、图标缓存、启动策略以及命令注入载荷。
 
-Run the Electron renderer smoke test separately:
+运行 Electron 界面回归测试：
 
 ```powershell
 npm run test:renderer
 ```
 
-It verifies that both pages load under the sandbox and strict CSP, the preload bridge is available, local fonts load, and the console contains no CSP violations.
+该测试验证主面板与设置页面能在沙箱和严格 CSP 下正常加载，并检查 preload 桥接、主题配色、设置控件、外部导航阻止、弹窗阻止和控制台错误。
 
-### Build and release audit
+### 构建与发行检查
 
 ```powershell
 npm run dist
 npm run audit:release
 ```
 
-The build writes an NSIS installer and unpacked application to `dist/`. The release audit scans packaged files for local build paths and common credential or personal-data patterns before publication.
+默认输出：
 
-| Output | Description |
+| 文件 | 用途 |
 | :--- | :--- |
-| `dist/Tar V Setup 1.0.6.exe` | NSIS installer with desktop and Start menu shortcut options |
-| `dist/win-unpacked/Tar V.exe` | Unpacked application used for local verification |
+| `dist/Tar V Setup 2.0.0.exe` | Windows x64 NSIS 安装程序 |
+| `dist/win-unpacked/Tar V.exe` | 用于本地验证的免安装构建 |
 
-## Project structure
+正式发布前应同时完成界面回归、安装测试、依赖审计和发行包脱敏检查。
+
+## 项目结构
 
 ```text
 Tar-V/
-├── main.js                  # Electron main process, windows, tray, and IPC
-├── preload.js               # narrow renderer bridge and drop-path resolution
+├── main.js                  # Electron 主进程、窗口、托盘和 IPC
+├── preload.js               # 受限的 Renderer API 桥接
 ├── lib/
-│   ├── args.js              # command-line argument parsing and escaping
-│   ├── config-schema.js     # configuration import validation
-│   ├── launch-policy.js     # launch target and argument policy
-│   ├── launch.js            # process launch flow
-│   ├── path-guard.js        # filesystem boundary validation
-│   ├── powershell.js        # encoded PowerShell invocation
-│   └── security-boundary.js # renderer and IPC source validation
-├── renderer/                # panel, settings, styles, scripts, and local fonts
-├── test/                    # Node.js tests and Electron smoke tests
-├── scripts/                 # release audit and development helpers
-├── docs/screenshots/        # README screenshots
-├── tray.png                 # application and tray icon
-├── package.json             # scripts, dependencies, and builder configuration
-└── LICENSE
+│   ├── args.js              # Windows 启动参数解析与转义
+│   ├── config-schema.js     # 配置导入校验与规范化
+│   ├── icon-cache.js        # 按条目和字节限制的 LRU 图标缓存
+│   ├── icon-service.js      # 图标解析、提取、缓存与回退
+│   ├── launch-policy.js     # 启动项目选择与权限策略
+│   ├── launch.js            # 进程启动流程
+│   ├── path-guard.js        # 文件系统访问边界
+│   ├── powershell.js        # PowerShell 编码调用与图标提取
+│   ├── security-boundary.js # 窗口、导航和 IPC 来源校验
+│   └── shortcut.js          # `.lnk`、`.url` 与协议链接解析
+├── renderer/                # 主面板、设置中心、样式和本地字体
+├── scripts/                 # 发行包审计工具
+├── test/                    # 功能、安全、图标和界面回归测试
+├── docs/screenshots/        # README 界面截图
+├── tray.png                 # 应用与托盘图标
+├── package.json             # 脚本、依赖和打包配置
+└── LICENSE                  # MIT License
 ```
+
+## 常见问题
+
+### 为什么某些游戏只显示通用图标？
+
+游戏快捷方式可能只是 `steam://` 等协议链接，不一定包含可直接读取的图片。Tar V 会优先读取快捷方式声明的本地图标；如果资源已经被游戏平台移动或删除，则使用协议回退图标。
+
+### 为什么管理员启动会显示 UAC 提示？
+
+这是 Windows 的权限确认机制。Tar V 不会绕过 UAC；只有明确选择管理员启动时才会请求提升权限。
+
+### 可以同步到多台电脑吗？
+
+当前版本不提供云同步。你可以在“备份与恢复”中导出 JSON，再在另一台电脑上导入。目标文件和应用仍需存在于对应路径。
+
+### 支持 macOS 或 Linux 吗？
+
+暂不支持。图标提取、快捷方式解析、全局启动和安装流程均针对 Windows 设计。
 
 ## License
 
-[MIT](LICENSE)
+本项目使用 [MIT License](LICENSE)。
 
 <p align="center">
-  <sub>Made with care by <a href="https://github.com/StarsofDeduce">StarsOfDeduce</a></sub>
+  <sub>Made with care by <a href="https://github.com/StarsOfDeduce">StarsOfDeduce</a></sub>
 </p>

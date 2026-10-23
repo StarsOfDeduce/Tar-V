@@ -3,7 +3,9 @@ const os = require('os');
 const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
-const distDir = path.join(projectRoot, 'dist');
+const distDir = process.env.TARV_AUDIT_DIST
+  ? path.resolve(projectRoot, process.env.TARV_AUDIT_DIST)
+  : path.join(projectRoot, 'dist');
 const unpackedDir = path.join(distDir, 'win-unpacked');
 const { version } = require('../package.json');
 const setupPath = path.join(distDir, `Tar V Setup ${version}.exe`);
@@ -52,7 +54,7 @@ const privateMarkers = unique([
   projectRoot,
   path.dirname(projectRoot),
   shortUsername
-]);
+]).filter((marker) => marker !== path.parse(marker).root);
 
 const packagedFiles = [...listFiles(unpackedDir), setupPath];
 const findings = [];

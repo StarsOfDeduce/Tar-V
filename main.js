@@ -15,6 +15,15 @@ const { createDirAuthorizer, hasTraversal } = require('./lib/path-guard');
 const { validateConfig } = require('./lib/config-schema');
 const { selectConfiguredLaunch } = require('./lib/launch-policy');
 const { isTrustedIpcEvent, hardenRendererWindow } = require('./lib/security-boundary');
+const { createIconService, ICON_EXTRACTOR_VERSION } = require('./lib/icon-service');
+const {
+  parseInternetShortcutBuffer,
+  normalizeShellShortcut,
+  isProtocolTarget,
+  protocolName,
+  steamAppId,
+  isShortcutPath
+} = require('./lib/shortcut');
 
 let win = null;
 let settingsWin = null; // Independent Settings Window
@@ -56,7 +65,8 @@ const TRAY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAd0lEQVQ
 const FALLBACK_ICONS = {
   file: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2FhYSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMkg2YTIgMiAwIDAgMC0yIDJ2MTZhMiAyIDAgMCAwIDIgMmgyMTZhMiAyIDAgMCAwIDItMlY4eiIvPjxwYXRoIGQ9Ik0xNCAydjZoNnoiIGZpbGw9IiNmZmYiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg==',
   folder: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2U4YTg3YyIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTAgNEg0Yy0xLjEgMC0xLjk5LjktMS45OSAyTDIgMThjMCAxLjEuOSAyIDIgMmgxNmMxLjEgMCAyLS45IDItMlY4YzAtMS4xLS45LTItMi0yaC04eiIvPjwvc3ZnPg==',
-  web: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzQ2OGFmZiIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMmgyYTIgMiAwIDAgMSAyIDJ2MTJhMiAyIDAgMCAxLTIgMmgtMmEyIDIgMCAwIDEtMi0yVjRhMiAyIDAgMCAxIDItMnpNMTIgMTlVNWwtNiA3em0tMy42My01LjMyTDkgMTMuNjNsLTEuNjMtMS42M0w2IDEyLjAybDEuMzctMS4zOHoiLz48L3N2Zz4='
+  web: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzQ2OGFmZiIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMmgyYTIgMiAwIDAgMSAyIDJ2MTJhMiAyIDAgMCAxLTIgMmgtMmEyIDIgMCAwIDEtMi0yVjRhMiAyIDAgMCAxIDItMnpNMTIgMTlVNWwtNiA3em0tMy42My01LjMyTDkgMTMuNjNsLTEuNjMtMS42M0w2IDEyLjAybDEuMzctMS4zOHoiLz48L3N2Zz4=',
+  steam: `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#1675b8"/><circle cx="43" cy="21" r="9" fill="none" stroke="white" stroke-width="5"/><circle cx="20" cy="43" r="7" fill="none" stroke="white" stroke-width="5"/><path d="M26 40l11-13" stroke="white" stroke-width="6" stroke-linecap="round"/></svg>').toString('base64')}`
 };
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'config.json');
@@ -94,7 +104,11 @@ function loadConfig() {
         tabKeys: false,
         styleMode: 'original',
         borderRadius: '8px',
-        bgColor: '#1e1e1e'
+        bgColor: '#1e1e1e',
+        accentColor: '#e04f35',
+        settingsBgColor: '#1c1c1c',
+        settingsAccentColor: '#61269c',
+        settingsFollowTheme: true
       },
       tabs: [
         { id: 'tab-1', name: '常用' },
@@ -377,6 +391,10 @@ if (!gotTheLock) {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (saveConfigDebounceTimeout) clearTimeout(saveConfigDebounceTimeout);
+  pendingImport = null;
+  cancelQueuedPowerShell();
+  iconService.dispose();
 });
 
 // Helper function to resolve environment variables and relative system commands to their absolute paths on Windows
@@ -464,6 +482,19 @@ handleTrustedIpc('save-config', ['main', 'settings'], (event, newConfig) => {
   return { success: true, warnings: validation.warnings };
 });
 
+// Preview appearance in the launcher without persisting it. Closing Settings restores
+// the last saved settings, while Save makes the preview permanent.
+handleTrustedIpc('preview-appearance', ['settings'], (event, previewConfig) => {
+  const validation = validateConfig(previewConfig);
+  if (!validation.ok) {
+    return { success: false, error: validation.errors.slice(0, 8).join('；') };
+  }
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('appearance-preview', validation.value.settings);
+  }
+  return { success: true };
+});
+
 // Open separate independent settings window
 handleTrustedIpc('open-settings-window', ['main'], () => {
   if (settingsWin) {
@@ -473,15 +504,18 @@ handleTrustedIpc('open-settings-window', ['main'], () => {
   }
   
   const config = loadConfig();
-  const settingsWidth = config.settings.settingsWindowSize?.width || 720;
-  const settingsHeight = config.settings.settingsWindowSize?.height || 520;
+  const settingsWidth = config.settings.settingsWindowSize?.width || 920;
+  const settingsHeight = config.settings.settingsWindowSize?.height || 680;
   
   settingsWin = new BrowserWindow({
     width: settingsWidth,
     height: settingsHeight,
     minWidth: 480,
-    minHeight: 360,
-    frame: true, // Standard window frame so it can be resized/moved easily
+    minHeight: 420,
+    frame: false,
+    transparent: true,
+    show: false,
+    backgroundColor: '#00000000',
     title: 'Tar V - 设置',
     autoHideMenuBar: true,
     webPreferences: {
@@ -494,6 +528,9 @@ handleTrustedIpc('open-settings-window', ['main'], () => {
   
   hardenRendererWindow(settingsWin, TRUSTED_RENDERER_URLS.settings);
   settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWin.once('ready-to-show', () => {
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.show();
+  });
   
   // Keep settings window centered on resize (Req 27) and remember size (Req 30)
   let resizeTimeout = null;
@@ -518,19 +555,23 @@ handleTrustedIpc('open-settings-window', ['main'], () => {
   settingsWin.on('close', () => {
     const cfg = loadConfig();
     saveConfigSync(cfg);
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('appearance-preview', cfg.settings);
+    }
   });
   
   settingsWin.on('closed', () => {
+    if (resizeTimeout) clearTimeout(resizeTimeout);
+    pendingImport = null;
     settingsWin = null;
   });
 });
 
-// In-memory icon cache to optimize icon loading speed
-const iconCache = new Map();
-
 // Concurrency queue for PowerShell icon extraction to prevent system freezing
 let activePowerShellCount = 0;
 const powershellQueue = [];
+const MAX_POWERSHELL_QUEUE = 256;
+let acceptsPowerShellTasks = true;
 
 function runNextPowerShell() {
   if (powershellQueue.length === 0 || activePowerShellCount >= 3) {
@@ -551,17 +592,32 @@ function runNextPowerShell() {
 
 function queuePowerShell(task) {
   return new Promise((resolve, reject) => {
+    if (!acceptsPowerShellTasks) {
+      reject(new Error('图标提取服务正在退出'));
+      return;
+    }
+    if (powershellQueue.length >= MAX_POWERSHELL_QUEUE) {
+      reject(new Error('图标提取队列已满，请稍后重试'));
+      return;
+    }
     powershellQueue.push({ task, resolve, reject });
     runNextPowerShell();
   });
 }
 
-// Helper to extract PE icon using PowerShell and .NET System.Drawing
-function extractIconWithPowerShell(targetPath) {
+function cancelQueuedPowerShell() {
+  acceptsPowerShellTasks = false;
+  while (powershellQueue.length > 0) {
+    powershellQueue.shift().reject(new Error('应用正在退出，图标提取已取消'));
+  }
+}
+
+// Helper to extract PE icon using PowerShell and .NET System.Drawing/Win32
+function extractIconWithPowerShell(targetPath, iconIndex = 0) {
   return queuePowerShell(async () => {
     // 脚本以 Base64 传入（-EncodedCommand），不经过 cmd.exe，也不拼接命令字符串，
     // 因此路径中的引号、反引号、分号等字符都无法跳出参数边界。
-    const result = await runEncodedPowerShell(buildIconExtractScript(targetPath));
+    const result = await runEncodedPowerShell(buildIconExtractScript(targetPath, iconIndex), { timeoutMs: 15000 });
     if (result.code !== 0) {
       throw new Error(result.stderr || `PowerShell 退出码 ${result.code}`);
     }
@@ -569,65 +625,148 @@ function extractIconWithPowerShell(targetPath) {
   });
 }
 
-// Get high-res icon for a path
-handleTrustedIpc('get-file-icon', ['main', 'settings'], async (event, filePath, forceRefresh = false) => {
-  if (!filePath) return FALLBACK_ICONS.file;
-  
-  // Handle URLs
-  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-    return FALLBACK_ICONS.web;
-  }
+function shortcutFallback(filePath = '') {
+  return {
+    target: filePath,
+    args: '',
+    cwd: '',
+    shortcutPath: isShortcutPath(filePath) ? filePath : '',
+    iconPath: '',
+    iconIndex: 0,
+    kind: ''
+  };
+}
 
-  // Check cache unless a force refresh is requested (e.g. from maintenance UI)
-  if (!forceRefresh && iconCache.has(filePath)) {
-    return iconCache.get(filePath);
-  }
+function resolveShortcutFile(filePath) {
+  const fallback = shortcutFallback(filePath);
+  if (typeof filePath !== 'string' || !path.isAbsolute(filePath) || hasTraversal(filePath)) return fallback;
 
-  // Resolve environment variables and path commands to get native icon
-  const cleanPath = resolveAbsolutePath(filePath);
-
-  let isDir = false;
+  let stat;
   try {
-    if (fs.existsSync(cleanPath) && fs.statSync(cleanPath).isDirectory()) {
-      isDir = true;
-    }
-  } catch (e) {}
-
-  let iconUrl = '';
-  try {
-    // Attempt to extract system file/folder icon via Electron native API (Req 25)
-    const icon = await app.getFileIcon(cleanPath, { size: 'large' });
-    iconUrl = icon.toDataURL();
+    stat = fs.statSync(filePath);
   } catch (err) {
-    try {
-      const icon = await app.getFileIcon(cleanPath, { size: 'normal' });
-      iconUrl = icon.toDataURL();
-    } catch (err2) {
-      iconUrl = isDir ? FALLBACK_ICONS.folder : FALLBACK_ICONS.file;
-    }
+    return fallback;
   }
+  if (!stat.isFile()) return fallback;
 
-  // Fallback to PowerShell if the returned icon is the generic exe placeholder on Windows
-  const isGeneric = !iconUrl || 
-                    iconUrl === FALLBACK_ICONS.file ||
-                    (iconUrl.length >= 1200 && iconUrl.length <= 1300) || 
-                    iconUrl.includes('iVBORw0KGgoAAAQCAYAAAAgCAY');
-  
-  if (isGeneric && !isDir && fs.existsSync(cleanPath) && cleanPath.toLowerCase().endsWith('.exe')) {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === '.lnk') {
     try {
-      const base64 = await extractIconWithPowerShell(cleanPath);
-      if (base64) {
-        iconUrl = `data:image/png;base64,${base64}`;
-      }
+      return normalizeShellShortcut(filePath, shell.readShortcutLink(filePath));
     } catch (err) {
-      console.error('PowerShell icon extraction failed for:', cleanPath, err.message);
+      console.error('Failed to resolve shortcut link:', err.message);
+      return fallback;
     }
   }
+  if (extension === '.url') {
+    if (stat.size > 64 * 1024) return fallback;
+    try {
+      return parseInternetShortcutBuffer(fs.readFileSync(filePath), { sourcePath: filePath });
+    } catch (err) {
+      console.error('Failed to resolve URL shortcut:', err.message);
+      return fallback;
+    }
+  }
+  return fallback;
+}
 
-  // Save to cache
-  iconCache.set(filePath, iconUrl);
+function findUrlFiles(root, maxDepth = 3, depth = 0, output = []) {
+  if (!root || depth > maxDepth || !fs.existsSync(root)) return output;
+  let entries;
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch (err) {
+    return output;
+  }
+  for (const entry of entries) {
+    const fullPath = path.join(root, entry.name);
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.url')) output.push(fullPath);
+    if (entry.isDirectory()) findUrlFiles(fullPath, maxDepth, depth + 1, output);
+  }
+  return output;
+}
 
-  return iconUrl;
+const steamShortcutCache = new Map();
+let steamShortcutIndex = null;
+
+function getSteamShortcutRoots() {
+  const configuredRoots = [];
+  try {
+    for (const category of loadConfig().categories || []) {
+      for (const item of category.items || []) {
+        const candidate = item.shortcutPath || item.path;
+        if (typeof candidate === 'string' && isShortcutPath(candidate)) {
+          configuredRoots.push(path.dirname(candidate));
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to inspect configured shortcut roots:', err.message);
+  }
+
+  return [...new Set([
+    app.getPath('desktop'),
+    process.env.PUBLIC ? path.join(process.env.PUBLIC, 'Desktop') : '',
+    process.env.APPDATA ? path.join(process.env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs') : '',
+    process.env.ProgramData ? path.join(process.env.ProgramData, 'Microsoft', 'Windows', 'Start Menu', 'Programs') : '',
+    ...configuredRoots
+  ].filter(Boolean).map((root) => path.resolve(root)))];
+}
+
+function getSteamShortcutIndex() {
+  if (steamShortcutIndex) return steamShortcutIndex;
+  const index = new Map();
+  for (const shortcutPath of getSteamShortcutRoots().flatMap((root) => findUrlFiles(root))) {
+    const details = resolveShortcutFile(shortcutPath);
+    const appId = steamAppId(details.target);
+    if (appId && !index.has(appId)) index.set(appId, details);
+  }
+  steamShortcutIndex = index;
+  return index;
+}
+
+function findSteamShortcut(target) {
+  const appId = steamAppId(target);
+  if (!appId) return null;
+  if (steamShortcutCache.has(appId)) return steamShortcutCache.get(appId);
+  const result = getSteamShortcutIndex().get(appId) || null;
+  steamShortcutCache.set(appId, result);
+  return result;
+}
+
+function enrichIconRequest(input) {
+  const request = typeof input === 'string' ? { path: input } : { ...(input || {}) };
+  const sourcePath = request.shortcutPath || (isShortcutPath(request.path) ? request.path : '');
+  let details = sourcePath ? resolveShortcutFile(sourcePath) : null;
+  if (!details && steamAppId(request.path)) details = findSteamShortcut(request.path);
+
+  if (details) {
+    request.path = details.target || request.path;
+    request.shortcutPath = details.shortcutPath || sourcePath;
+    request.iconPath = details.iconPath || request.iconPath || '';
+    request.iconIndex = Number.isInteger(details.iconIndex) ? details.iconIndex : (request.iconIndex || 0);
+  }
+  if (request.path && !isProtocolTarget(request.path) && !isShortcutPath(request.path)) {
+    request.path = resolveAbsolutePath(request.path);
+  }
+  return request;
+}
+
+const iconService = createIconService({
+  app,
+  nativeImage,
+  extractExecutableIcon: extractIconWithPowerShell,
+  cacheDir: path.join(app.getPath('userData'), `icon-cache-v${ICON_EXTRACTOR_VERSION}`),
+  fallbackIcons: FALLBACK_ICONS
+});
+
+// Get a native icon using shortcut metadata, bounded caches and in-flight de-duplication.
+handleTrustedIpc('get-file-icon', ['main', 'settings'], async (event, input, forceRefresh = false) => {
+  return iconService.getIcon(enrichIconRequest(input), { forceRefresh: forceRefresh === true });
+});
+
+handleTrustedIpc('resolve-icon-request', ['main', 'settings'], (event, input) => {
+  return enrichIconRequest(input);
 });
 
 // 判断是否为"系统命令引用"（例如 cmd.exe 这类相对名），交给系统按 PATH 解析
@@ -648,8 +787,12 @@ handleTrustedIpc('launch-item', ['main'], async (event, itemId, forceRunAsAdmin 
   }
   
   try {
-    // Handle Web URLs
-    if (/^https?:\/\//i.test(filePath)) {
+    // Handle web and registered application protocols (for example steam://).
+    if (isProtocolTarget(filePath)) {
+      const protocol = protocolName(filePath);
+      if (['file', 'javascript', 'data', 'vbscript'].includes(protocol)) {
+        throw new Error(`不允许启动协议: ${protocol}`);
+      }
       await shell.openExternal(filePath);
       if (config.settings.autoHideOnLaunch) {
         hideWindow();
@@ -720,8 +863,8 @@ handleTrustedIpc('show-item-in-folder', ['main'], (event, itemId) => {
   if (typeof filePath !== 'string' || filePath.trim().length === 0) {
     return { success: false, error: '启动路径解析失败' };
   }
-  if (/^https?:\/\//i.test(filePath)) {
-    return { success: false, error: '网页启动项没有本地位置' };
+  if (isProtocolTarget(filePath)) {
+    return { success: false, error: '协议启动项没有本地位置' };
   }
 
   const cleanPath = resolveAbsolutePath(filePath);
@@ -799,7 +942,7 @@ handleTrustedIpc('check-paths', ['settings'], (event, paths) => {
 
   return paths.map((p) => {
     if (typeof p !== 'string' || p.length === 0) return false;
-    if (/^https?:\/\//i.test(p)) return true;
+    if (isProtocolTarget(p)) return true;
 
     // 相对系统命令（如 cmd.exe）不做存在性探测，一律视为可用
     if (!path.isAbsolute(p)) return true;
@@ -842,7 +985,11 @@ handleTrustedIpc('export-config', ['settings'], async (event) => {
 
   try {
     const config = loadConfig();
-    fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8');
+    const exportable = {
+      ...config,
+      items: config.items.map((item) => ({ ...item, icon: '' }))
+    };
+    fs.writeFileSync(result.filePath, JSON.stringify(exportable, null, 2), 'utf-8');
     return { success: true, path: result.filePath };
   } catch (err) {
     return { success: false, error: err.message };
@@ -968,94 +1115,6 @@ handleTrustedIpc('get-folder-files', ['main'], async (event, folderPath) => {
 
 // Resolve windows .lnk and .url shortcuts target
 handleTrustedIpc('resolve-shortcut', ['main'], (event, filePath) => {
-  const fallback = { target: filePath || '', args: '', cwd: '', iconPath: '' };
-
-  if (typeof filePath !== 'string' || filePath.length === 0) {
-    return { target: '', args: '', cwd: '', iconPath: '' };
-  }
-  // 只解析真实存在的绝对路径，并拒绝路径穿越
-  if (!path.isAbsolute(filePath) || hasTraversal(filePath)) {
-    return fallback;
-  }
-
-  let fileStat;
-  try {
-    fileStat = fs.statSync(filePath);
-  } catch (err) {
-    return fallback;
-  }
-  if (!fileStat.isFile()) {
-    return fallback;
-  }
-
-  const lowerPath = filePath.toLowerCase();
-  
-  if (lowerPath.endsWith('.lnk')) {
-    try {
-      const shortcut = shell.readShortcutLink(filePath);
-      return {
-        target: shortcut.target || filePath,
-        args: shortcut.args || '',
-        cwd: shortcut.cwd || '',
-        iconPath: ''
-      };
-    } catch (err) {
-      console.error('Failed to resolve shortcut link:', err);
-      return { target: filePath, args: '', cwd: '', iconPath: '' };
-    }
-  }
-  
-  if (lowerPath.endsWith('.url')) {
-    try {
-      // .url 是纯文本文件，限制读取体积，避免被用来读取大文件
-      if (fileStat.size > 64 * 1024) {
-        return { target: filePath, args: '', cwd: '', iconPath: '' };
-      }
-
-      let content = '';
-      const buffer = fs.readFileSync(filePath);
-      // Detect UTF-16 LE BOM (0xFF 0xFE)
-      if (buffer[0] === 0xff && buffer[1] === 0xfe) {
-        content = buffer.toString('utf16le');
-      } else {
-        content = buffer.toString('utf-8');
-      }
-      
-      // Parse URL key
-      const urlMatch = content.match(/URL=(.+)/i);
-      const target = urlMatch ? urlMatch[1].trim() : filePath;
-      
-      // Parse IconFile key
-      const iconFileMatch = content.match(/IconFile=(.+)/i);
-      let iconPath = iconFileMatch ? iconFileMatch[1].trim() : '';
-      
-      // Expand environment variables in iconPath if any
-      if (iconPath) {
-        iconPath = iconPath.replace(/%([^%]+)%/g, (_, n) => process.env[n] || `%${n}%`);
-        if (iconPath.startsWith('"') && iconPath.endsWith('"')) {
-          iconPath = iconPath.slice(1, -1);
-        }
-        // Strip index if present, e.g. "C:\path\to\icon.ico,0"
-        const lastCommaIdx = iconPath.lastIndexOf(',');
-        if (lastCommaIdx !== -1) {
-          const suffix = iconPath.substring(lastCommaIdx + 1);
-          if (/^-?\d+$/.test(suffix.trim())) {
-            iconPath = iconPath.substring(0, lastCommaIdx).trim();
-          }
-        }
-      }
-      
-      return {
-        target: target,
-        args: '',
-        cwd: '',
-        iconPath: iconPath
-      };
-    } catch (err) {
-      console.error('Failed to resolve URL shortcut:', err);
-      return { target: filePath, args: '', cwd: '', iconPath: '' };
-    }
-  }
-  
-  return { target: filePath, args: '', cwd: '', iconPath: '' };
+  if (typeof filePath !== 'string' || filePath.length === 0) return shortcutFallback('');
+  return resolveShortcutFile(filePath);
 });

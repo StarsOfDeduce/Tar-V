@@ -28,6 +28,7 @@ app.setPath('cache', path.join(profilePath, 'cache'));
 const pageErrors = [];
 let testWindow = null;
 let activeTrustedUrl = '';
+let previewRequests = 0;
 
 const stubConfig = {
   settings: {
@@ -48,7 +49,11 @@ const stubConfig = {
     tabKeys: false,
     styleMode: 'original',
     borderRadius: '8px',
-    bgColor: '#1e1e1e'
+    bgColor: '#1e1e1e',
+    accentColor: '#e04f35',
+    settingsBgColor: '#151517',
+    settingsAccentColor: '#61269c',
+    settingsFollowTheme: true
   },
   tabs: [{ id: 'tab-1', name: '常用' }],
   items: [
@@ -70,7 +75,12 @@ const ICON_STUB = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA
 const stubs = {
   'get-config': () => stubConfig,
   'save-config': () => ({ success: true }),
+  'preview-appearance': () => {
+    previewRequests++;
+    return { success: true };
+  },
   'get-file-icon': () => ICON_STUB,
+  'resolve-icon-request': (event, request) => request,
   'launch-item': () => ({ success: true }),
   'show-item-in-folder': () => ({ success: true }),
   'select-file': () => null,
@@ -158,7 +168,100 @@ app.whenReady().then(async () => {
       const checks = await win.webContents.executeJavaScript(`(async () => {
         await document.fonts.ready;
         let deadPathEscaped = true;
+        let dedicatedSettingsStyles = true;
+        let settingsUsesNoGradients = true;
+        let aplombSettingsStructure = true;
+        let settingsColorsWork = true;
+        let floatingButtonsClearContent = true;
+        let settingsOuterFrameRemoved = true;
+        let controlTextCentered = true;
+        let footerButtonsReadable = true;
         if (${JSON.stringify(page.label)} === 'settings') {
+          dedicatedSettingsStyles = Array.from(document.styleSheets).some((sheet) =>
+            String(sheet.href || '').endsWith('/settings.css')
+          );
+          const visualNodes = [
+            document.body,
+            document.querySelector('.settings-window-container'),
+            document.querySelector('.settings-sidebar'),
+            document.querySelector('.settings-section.active'),
+            document.querySelector('.sidebar-item.active'),
+            document.getElementById('btn-settings-save')
+          ].filter(Boolean);
+          settingsUsesNoGradients = visualNodes.every((node) =>
+            getComputedStyle(node).backgroundImage === 'none'
+          );
+          document.querySelector('.sidebar-item[data-tab="settings-appearance"]').click();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const appearanceGrid = document.querySelector('#settings-appearance .settings-card-grid');
+          const firstCard = document.querySelector('#settings-appearance .settings-card');
+          const settingsBgInput = document.getElementById('opt-settings-bg-color');
+          const settingsAccentInput = document.getElementById('opt-settings-accent-color');
+          const settingsFollowInput = document.getElementById('opt-settings-follow-theme');
+          const firstSettingRow = document.querySelector('#settings-appearance .setting-row');
+          const footer = document.querySelector('.settings-footer');
+          const settingsWindow = document.querySelector('.settings-window-container');
+          const saveButton = document.getElementById('btn-settings-save');
+          const cancelButton = document.getElementById('btn-settings-cancel');
+          const firstSelectTrigger = document.querySelector('.custom-select-trigger');
+          aplombSettingsStructure = !!document.querySelector('.settings-chrome') &&
+            !!document.getElementById('btn-window-close') &&
+            !document.querySelector('.sidebar-brand-mark') &&
+            document.querySelectorAll('#settings-appearance .settings-card').length >= 3 &&
+            !document.querySelector('#settings-appearance .studio-hero') &&
+            !document.getElementById('opt-bg-color') &&
+            !!appearanceGrid && getComputedStyle(appearanceGrid).display === 'block' &&
+            !!firstCard && getComputedStyle(firstCard).boxShadow === 'none' &&
+            !!firstSettingRow && getComputedStyle(firstSettingRow).borderRadius === '0px' &&
+            !!footer && getComputedStyle(footer).borderTopWidth === '0px' &&
+            getComputedStyle(settingsWindow).boxShadow === 'none' &&
+            parseFloat(getComputedStyle(document.querySelector('.sidebar-item')).fontSize) >= 17 &&
+            getComputedStyle(document.querySelector('.sidebar-nav')).flexDirection === 'row' &&
+            !!settingsBgInput && !!settingsAccentInput && !!settingsFollowInput;
+          settingsOuterFrameRemoved = getComputedStyle(document.body).padding === '0px' &&
+            getComputedStyle(settingsWindow).borderTopWidth === '0px' &&
+            getComputedStyle(settingsWindow).borderRightWidth === '0px' &&
+            getComputedStyle(settingsWindow).borderBottomWidth === '0px' &&
+            getComputedStyle(settingsWindow).borderLeftWidth === '0px';
+          controlTextCentered = !!firstSelectTrigger &&
+            getComputedStyle(firstSelectTrigger).textAlign === 'center' &&
+            getComputedStyle(firstSelectTrigger).justifyContent === 'center' &&
+            getComputedStyle(firstSelectTrigger).alignItems === 'center' &&
+            getComputedStyle(settingsBgInput).textAlign === 'center';
+          footerButtonsReadable = [saveButton, cancelButton].every((button) => {
+            const style = getComputedStyle(button);
+            return parseFloat(style.fontSize) === 16 &&
+              parseInt(style.fontWeight, 10) === 400 &&
+              style.justifyContent === 'center' && style.alignItems === 'center' &&
+              style.textAlign === 'center';
+          });
+          const styleMode = document.getElementById('opt-style-mode');
+          styleMode.value = 'light';
+          styleMode.dispatchEvent(new Event('change', { bubbles: true }));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const followsLightTheme = getComputedStyle(document.body).getPropertyValue('--settings-bg-custom').trim() === '#ffffff' &&
+            getComputedStyle(document.body).getPropertyValue('--studio-accent').trim() === '#61269c';
+          settingsFollowInput.checked = false;
+          settingsFollowInput.dispatchEvent(new Event('change', { bubbles: true }));
+          settingsBgInput.value = '#20242b';
+          settingsBgInput.dispatchEvent(new Event('input', { bubbles: true }));
+          settingsAccentInput.value = '#22c55e';
+          settingsAccentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          const launcherAccentInput = document.getElementById('opt-accent-color');
+          launcherAccentInput.value = '#e85d3f';
+          launcherAccentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          settingsColorsWork = followsLightTheme &&
+            getComputedStyle(document.documentElement).getPropertyValue('--settings-bg-custom').trim() === '#20242b' &&
+            getComputedStyle(document.documentElement).getPropertyValue('--studio-accent').trim() === '#22c55e' &&
+            getComputedStyle(document.body).getPropertyValue('--settings-bg-custom').trim() === '#20242b' &&
+            getComputedStyle(document.body).getPropertyValue('--studio-accent').trim() === '#22c55e';
+          const content = document.querySelector('.settings-content');
+          content.scrollTop = content.scrollHeight;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const appearanceRows = Array.from(document.querySelectorAll('#settings-appearance .setting-row'));
+          const lastRow = appearanceRows.at(-1);
+          floatingButtonsClearContent = !!lastRow && !!saveButton &&
+            lastRow.getBoundingClientRect().bottom + 10 <= saveButton.getBoundingClientRect().top;
           document.getElementById('btn-scan-paths').click();
           await new Promise((resolve) => setTimeout(resolve, 100));
           const pathName = document.querySelector('.path-item-row .path-name');
@@ -177,9 +280,19 @@ app.whenReady().then(async () => {
           interLoaded: document.fonts.check('16px Inter'),
           title: document.title,
           deadPathEscaped,
+          dedicatedSettingsStyles,
+          settingsUsesNoGradients,
+          aplombSettingsStructure,
+          settingsColorsWork,
+          floatingButtonsClearContent,
+          settingsOuterFrameRemoved,
+          controlTextCentered,
+          footerButtonsReadable,
           popupBlocked: window.open('https://example.com/') === null
         };
       })()`);
+
+      checks.mainPreviewSent = page.label !== 'settings' || previewRequests > 0;
 
       await win.webContents.executeJavaScript("window.location.href = 'https://example.com/'; true");
       await new Promise((r) => setTimeout(r, 100));
@@ -211,6 +324,10 @@ app.whenReady().then(async () => {
   const allGood = pageResults.length === pages.length && pageResults.every((r) =>
     r.checks && r.checks.hasApi && !r.checks.hasRequire && !r.checks.hasProcess &&
     !r.checks.hasModule && r.checks.cspMeta && r.checks.interLoaded && r.checks.deadPathEscaped &&
+    r.checks.dedicatedSettingsStyles && r.checks.settingsUsesNoGradients && r.checks.aplombSettingsStructure &&
+    r.checks.settingsColorsWork &&
+    r.checks.floatingButtonsClearContent && r.checks.settingsOuterFrameRemoved &&
+    r.checks.controlTextCentered && r.checks.footerButtonsReadable && r.checks.mainPreviewSent &&
     r.checks.popupBlocked && r.checks.navigationBlocked &&
     r.cspViolations.length === 0 && r.errorMessages.length === 0
   );

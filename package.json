@@ -1,19 +1,24 @@
 {
   "name": "tar-v",
-  "version": "1.0.6",
-  "description": "",
+  "version": "2.0.0",
+  "description": "A fast local launcher for Windows apps, games, files, and folders.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "audit:release": "node scripts/audit-release.js",
-    "test": "node test/security.test.js && node test/launch.test.js",
+    "test": "node test/security.test.js && node test/icon-service.test.js && node test/launch.test.js",
     "test:renderer": "electron test/renderer-smoke.js --disable-gpu"
   },
   "build": {
     "appId": "com.starsofdeduce.tarv",
     "productName": "Tar V",
+    "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "zh-CN"
+    ],
     "win": {
       "target": "nsis",
       "icon": "tray.png"
@@ -39,11 +44,11 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^42.11.15",
-    "electron-builder": "^26.17.0"
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0"
   },
   "overrides": {
     "app-builder-lib": {

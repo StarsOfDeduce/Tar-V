@@ -6,6 +6,58 @@ let isBatchMode = false;
 let selectedItemsForBatch = new Set();
 let draggedItemId = null;
 let draggedTabId = null;
+const ICON_EXTRACTOR_VERSION = 2;
+const runtimeIconCache = new Map();
+const runtimeIconLoads = new Map();
+
+function isProtocolPath(value) {
+  return typeof value === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+}
+
+function iconRequestFromItem(item) {
+  return {
+    path: item.path || '',
+    shortcutPath: item.shortcutPath || '',
+    iconPath: item.iconPath || '',
+    iconIndex: Number.isInteger(item.iconIndex) ? item.iconIndex : 0
+  };
+}
+
+function applyIconMetadata(item, request) {
+  item.shortcutPath = request.shortcutPath || '';
+  item.iconPath = request.iconPath || '';
+  item.iconIndex = Number.isInteger(request.iconIndex) ? request.iconIndex : 0;
+  item.iconVersion = ICON_EXTRACTOR_VERSION;
+  item.icon = '';
+}
+
+async function loadItemIcon(item, { forceRefresh = false } = {}) {
+  if (runtimeIconLoads.has(item.id)) return runtimeIconLoads.get(item.id);
+  const promise = (async () => {
+    const request = await window.api.resolveIconRequest(iconRequestFromItem(item));
+    const iconUrl = await window.api.getFileIcon(request, forceRefresh);
+    runtimeIconCache.set(item.id, iconUrl);
+    applyIconMetadata(item, request);
+    return iconUrl;
+  })().finally(() => runtimeIconLoads.delete(item.id));
+  runtimeIconLoads.set(item.id, promise);
+  return promise;
+}
+
+async function migrateLegacyIconsInBackground() {
+  let changed = 0;
+  for (const item of config.items) {
+    if (item.iconVersion === ICON_EXTRACTOR_VERSION) continue;
+    try {
+      await loadItemIcon(item, { forceRefresh: true });
+      changed++;
+      if (changed % 10 === 0) await window.api.saveConfig(config);
+    } catch (err) {
+      console.error('Background icon migration failed:', item.name, err);
+    }
+  }
+  if (changed > 0) await window.api.saveConfig(config);
+}
 
 // Dictionary for multi-language translation (Req 34)
 const TRANSLATIONS = {
@@ -464,6 +516,7 @@ async function init() {
   renderTabs();
   renderItems();
   setupEventListeners();
+  setTimeout(() => migrateLegacyIconsInBackground(), 750);
 
   // Listen to prefers-color-scheme theme changes dynamically (Req 35)
   const themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -514,11 +567,11 @@ function mergeDefaultSettings() {
 }
 
 // Apply settings and customization sizers to HTML CSS variables
-function applyAppearanceSettings() {
-  const styleMode = config.settings.styleMode || 'dark';
-  const radius = config.settings.borderRadius || '8px';
-  const accentColor = config.settings.accentColor || '#e04f35';
-  const opacity = config.settings.opacity !== undefined ? config.settings.opacity : 85;
+function applyAppearanceSettings(settings = config.settings) {
+  const styleMode = settings.styleMode || 'dark';
+  const radius = settings.borderRadius || '8px';
+  const accentColor = settings.accentColor || '#e04f35';
+  const opacity = settings.opacity !== undefined ? settings.opacity : 85;
   const alpha = opacity / 100;
 
   // Set theme background color with opacity (Req 35)
@@ -539,10 +592,10 @@ function applyAppearanceSettings() {
   }
 
   // Set columns
-  const cols = config.settings.columns || 8;
+  const cols = settings.columns || 8;
   itemsGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   
-  if (config.settings.hideNames) {
+  if (settings.hideNames) {
     itemsGrid.classList.add('hide-names');
   } else {
     itemsGrid.classList.remove('hide-names');
@@ -553,20 +606,20 @@ function applyAppearanceSettings() {
   if (container) {
     container.style.borderRadius = radius;
     container.style.background = `rgba(${baseColor.r}, ${baseColor.g}, ${baseColor.b}, ${alpha})`;
-    container.style.backdropFilter = 'blur(20px)';
-    container.style.webkitBackdropFilter = 'blur(20px)';
+    container.style.backdropFilter = 'none';
+    container.style.webkitBackdropFilter = 'none';
   }
 
   // Search box visibility
   const searchBox = document.querySelector('.search-box');
   if (searchBox) {
-    searchBox.style.display = config.settings.showSearch !== false ? 'flex' : 'none';
+    searchBox.style.display = settings.showSearch !== false ? 'flex' : 'none';
   }
 
   // Custom font sizers variables
-  const fsTab = config.settings.fontSizeTab || 14;
-  const fsItem = config.settings.fontSizeItem || 13;
-  const fsSettings = config.settings.fontSizeSettings || 14;
+  const fsTab = settings.fontSizeTab || 14;
+  const fsItem = settings.fontSizeItem || 13;
+  const fsSettings = settings.fontSizeSettings || 14;
 
   document.documentElement.style.setProperty('--accent', accentColor);
   document.documentElement.style.setProperty('--border-focus', accentColor);
@@ -766,6 +819,10 @@ function renderTabs() {
 }
 
 async function renderItems(query = '') {
+  const currentIds = new Set(config.items.map((item) => item.id));
+  for (const itemId of runtimeIconCache.keys()) {
+    if (!currentIds.has(itemId)) runtimeIconCache.delete(itemId);
+  }
   itemsGrid.innerHTML = '';
   
   let itemsToRender = [];
@@ -820,6 +877,10 @@ async function renderItems(query = '') {
     const iconImg = document.createElement('img');
     iconImg.className = 'item-icon';
     iconImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2FhYSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMkg2YTIgMiAwIDAgMC0yIDJ2MTZhMiAyIDAgMCAwIDIgMmgyMTZhMiAyIDAgMCAwIDItMlY4eiIvPjxwYXRoIGQ9Ik0xNCAydjZoNnoiIGZpbGw9IiNmZmYiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg==';
+    iconImg.addEventListener('error', () => {
+      runtimeIconCache.delete(item.id);
+      iconImg.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2FhYSIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48cGF0aCBkPSJNMTQgMkg2YTIgMiAwIDAgMC0yIDJ2MTZhMiAyIDAgMCAwIDIgMmgyMTZhMiAyIDAgMCAwIDItMlY4eiIvPjxwYXRoIGQ9Ik0xNCAydjZoNnoiIGZpbGw9IiNmZmYiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg==';
+    }, { once: true });
     
     iconWrap.appendChild(iconImg);
     iconImg.setAttribute('draggable', 'false'); // Prevents browser image drag delay (Req 46)
@@ -842,15 +903,17 @@ async function renderItems(query = '') {
 
     itemsGrid.appendChild(card);
 
-    // Dynamic icon loading with local config caching
-    if (item.icon) {
-      iconImg.src = item.icon;
-    } else {
-      window.api.getFileIcon(item.path).then(url => {
-        iconImg.src = url;
-        item.icon = url;
-        debouncedSaveConfig();
-      }).catch(err => {
+    // Keep icon payloads out of config. The main process owns bounded memory/disk caches.
+    const runtimeIcon = runtimeIconCache.get(item.id);
+    if (runtimeIcon) iconImg.src = runtimeIcon;
+    else if (item.icon) iconImg.src = item.icon; // legacy placeholder while migration runs
+
+    if (!runtimeIcon) {
+      const requiresMigration = item.iconVersion !== ICON_EXTRACTOR_VERSION;
+      loadItemIcon(item, { forceRefresh: requiresMigration }).then((url) => {
+        if (iconImg.isConnected) iconImg.src = url;
+        if (requiresMigration) debouncedSaveConfig();
+      }).catch((err) => {
         console.error('File icon extraction error', err);
       });
     }
@@ -1013,7 +1076,7 @@ function showCardContextMenu(itemId, x, y) {
     const isExe = item.path && (item.path.endsWith('.exe') || item.path.endsWith('.bat') || item.path.endsWith('.cmd'));
     contextMenu.querySelector('[data-action="admin"]').style.display = isExe ? 'flex' : 'none';
     
-    const isUrl = item.path && (item.path.startsWith('http://') || item.path.startsWith('https://'));
+    const isUrl = isProtocolPath(item.path);
     contextMenu.querySelector('[data-action="location"]').style.display = isUrl ? 'none' : 'flex';
   }
   
@@ -1160,27 +1223,35 @@ async function batchImportFolder() {
       name = name.substring(0, name.lastIndexOf('.'));
     }
     
-    let iconPath = '';
+    let shortcutDetails = null;
     if (file.path.toLowerCase().endsWith('.lnk') || file.path.toLowerCase().endsWith('.url')) {
-      const resolved = await window.api.resolveShortcut(file.path);
-      finalPath = resolved.target;
-      finalArgs = resolved.args;
-      if (resolved.iconPath) {
-        iconPath = resolved.iconPath;
-      }
+      shortcutDetails = await window.api.resolveShortcut(file.path);
+      finalPath = shortcutDetails.target;
+      finalArgs = shortcutDetails.args;
     }
-    
-    // Extract and cache icon
-    const iconDataUrl = await window.api.getFileIcon(iconPath || finalPath);
-    
+
+    const itemId = 'item-batch-' + Date.now() + '-' + i + '-' + Math.floor(Math.random()*1000);
+    const iconRequest = await window.api.resolveIconRequest({
+      path: finalPath,
+      shortcutPath: shortcutDetails ? shortcutDetails.shortcutPath : '',
+      iconPath: shortcutDetails ? shortcutDetails.iconPath : '',
+      iconIndex: shortcutDetails ? shortcutDetails.iconIndex : 0
+    });
+    const iconDataUrl = await window.api.getFileIcon(iconRequest);
+    runtimeIconCache.set(itemId, iconDataUrl);
+
     config.items.push({
-      id: 'item-batch-' + Date.now() + '-' + i + '-' + Math.floor(Math.random()*1000),
+      id: itemId,
       tabId: activeTabId,
       name: name,
       path: finalPath,
       args: finalArgs,
       runAsAdmin: false,
-      icon: iconDataUrl
+      icon: '',
+      shortcutPath: iconRequest.shortcutPath || '',
+      iconPath: iconRequest.iconPath || '',
+      iconIndex: iconRequest.iconIndex || 0,
+      iconVersion: ICON_EXTRACTOR_VERSION
     });
     count++;
   }
@@ -1233,17 +1304,21 @@ async function saveItemDetails() {
   let targetPath = filePath;
   let targetArgs = args;
   
-  let iconPath = '';
+  let shortcutDetails = null;
   if (filePath.toLowerCase().endsWith('.lnk') || filePath.toLowerCase().endsWith('.url')) {
-    const resolved = await window.api.resolveShortcut(filePath);
-    targetPath = resolved.target;
-    if (resolved.args) targetArgs = resolved.args;
-    if (resolved.iconPath) iconPath = resolved.iconPath;
+    shortcutDetails = await window.api.resolveShortcut(filePath);
+    targetPath = shortcutDetails.target;
+    if (shortcutDetails.args) targetArgs = shortcutDetails.args;
   }
-  
-  // Extract and cache icon
-  const iconDataUrl = await window.api.getFileIcon(iconPath || targetPath);
-  
+
+  const iconRequest = await window.api.resolveIconRequest({
+    path: targetPath,
+    shortcutPath: shortcutDetails ? shortcutDetails.shortcutPath : '',
+    iconPath: shortcutDetails ? shortcutDetails.iconPath : '',
+    iconIndex: shortcutDetails ? shortcutDetails.iconIndex : 0
+  });
+  const iconDataUrl = await window.api.getFileIcon(iconRequest, true);
+
   if (selectedItemId) {
     const item = config.items.find(i => i.id === selectedItemId);
     if (item) {
@@ -1251,18 +1326,23 @@ async function saveItemDetails() {
       item.path = targetPath;
       item.args = targetArgs;
       item.runAsAdmin = admin;
-      item.icon = iconDataUrl;
+      applyIconMetadata(item, iconRequest);
+      runtimeIconCache.set(item.id, iconDataUrl);
     }
   } else {
-    config.items.push({
-      id: 'item-' + Date.now(),
+    const itemId = 'item-' + Date.now();
+    const newItem = {
+      id: itemId,
       tabId: activeTabId,
       name: name,
       path: targetPath,
       args: targetArgs,
       runAsAdmin: admin,
-      icon: iconDataUrl
-    });
+      icon: ''
+    };
+    applyIconMetadata(newItem, iconRequest);
+    runtimeIconCache.set(itemId, iconDataUrl);
+    config.items.push(newItem);
   }
   
   await window.api.saveConfig(config);
@@ -1599,26 +1679,35 @@ function setupEventListeners() {
         dispName = originalName.substring(0, originalName.lastIndexOf('.'));
       }
       
-      let iconPath = '';
+      let shortcutDetails = null;
       if (targetPath.toLowerCase().endsWith('.lnk') || targetPath.toLowerCase().endsWith('.url')) {
-        const resolved = await window.api.resolveShortcut(targetPath);
-        targetPath = resolved.target;
-        targetArgs = resolved.args;
-        if (resolved.iconPath) {
-          iconPath = resolved.iconPath;
-        }
+        shortcutDetails = await window.api.resolveShortcut(targetPath);
+        targetPath = shortcutDetails.target;
+        targetArgs = shortcutDetails.args;
       }
-      
-      const iconDataUrl = await window.api.getFileIcon(iconPath || targetPath);
-      
+
+      const itemId = 'item-drop-' + Date.now() + '-' + i + '-' + Math.floor(Math.random() * 1000);
+      const iconRequest = await window.api.resolveIconRequest({
+        path: targetPath,
+        shortcutPath: shortcutDetails ? shortcutDetails.shortcutPath : '',
+        iconPath: shortcutDetails ? shortcutDetails.iconPath : '',
+        iconIndex: shortcutDetails ? shortcutDetails.iconIndex : 0
+      });
+      const iconDataUrl = await window.api.getFileIcon(iconRequest);
+      runtimeIconCache.set(itemId, iconDataUrl);
+
       config.items.push({
-        id: 'item-drop-' + Date.now() + '-' + i + '-' + Math.floor(Math.random() * 1000),
+        id: itemId,
         tabId: activeTabId,
         name: dispName,
         path: targetPath,
         args: targetArgs,
         runAsAdmin: false,
-        icon: iconDataUrl
+        icon: '',
+        shortcutPath: iconRequest.shortcutPath || '',
+        iconPath: iconRequest.iconPath || '',
+        iconIndex: iconRequest.iconIndex || 0,
+        iconVersion: ICON_EXTRACTOR_VERSION
       });
     }
 
@@ -1697,10 +1786,15 @@ function setupEventListeners() {
 
   window.api.onConfigUpdated((newConfig) => {
     config = newConfig;
+    runtimeIconCache.clear();
     translateUI();
     applyAppearanceSettings();
     renderTabs();
     renderItems();
+  });
+
+  window.api.onAppearancePreview((settings) => {
+    applyAppearanceSettings(settings);
   });
 
   const batchCancelBtn = document.getElementById('batch-cancel-btn');
